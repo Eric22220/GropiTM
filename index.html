@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#102b32">
+<title>BikeGuard | Sensor Kill Test</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color-scheme:dark;background:#091c22;color:#f2fcfa}*{box-sizing:border-box}body{margin:0;padding:18px;max-width:860px;margin-inline:auto}header{display:flex;gap:12px;align-items:center;margin-bottom:18px}.logo{font-size:28px}h1{font-size:24px;margin:0}p{line-height:1.5;color:#adcacb}.subtitle{font-size:13px;margin:2px 0}.card{background:#122e36;border:1px solid #294a51;border-radius:14px;padding:17px;margin:12px 0}h2{font-size:17px;margin:0 0 11px}button{border:0;border-radius:10px;padding:13px 16px;font:600 15px system-ui;cursor:pointer;background:#53dab0;color:#082b28;margin:3px}button.secondary{background:#365860;color:#f6fffb}button:disabled{opacity:.45;cursor:default}.row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metric{border:1px solid #35545b;border-radius:10px;padding:12px}.num{font-size:23px;font-weight:700;font-variant-numeric:tabular-nums}.key{font-size:12px;color:#b2cdca}.notice{background:#3a3017;border:1px solid #846b36;padding:12px;border-radius:9px;color:#ffe7a3}#chart{width:100%;height:150px;display:block;background:#071820;border-radius:9px;border:1px solid #294a51}#log{font:12px/1.65 ui-monospace,Consolas,monospace;white-space:pre-wrap;color:#bcdad7;max-height:130px;overflow:auto}code{color:#87e5e9}footer{font-size:12px;color:#9bbab9;margin:20px 0}#state{font-weight:650;color:#fbd081}
+</style>
+</head>
+<body>
+<header><div class="logo">🚲</div><div><h1>BikeGuard · Sensor Kill Test</h1><p class="subtitle">Test real: accelerometru + GPS, fără backend. Datele rămân pe telefon.</p></div></header>
+<div class="notice" id="secureNotice">Verificare securitate…</div>
+<div class="card">
+<h2>1. Permisiuni și înregistrare</h2>
+<p>Apasă <b>Accelero</b> și acceptă accesul la mișcare (în Safari iOS). Apoi apasă <b>GPS</b> și permite locația. Ține pagina deschisă și ecranul activ. Oprește și exportă CSV.</p>
+<div class="row">
+<button id="motionStart">▶ Start accelerometru</button>
+<button id="gpsStart">📍 Start GPS</button>
+<button id="stop" class="secondary">■ Oprește</button>
+<button id="export" class="secondary">⬇ Export CSV</button>
+</div>
+<p id="state">Neînceput</p>
+</div>
+<div class="card">
+<h2>2. Date live</h2>
+<div class="metrics">
+<div class="metric"><div class="key">Evenimente accelero</div><div class="num" id="samples">0</div></div>
+<div class="metric"><div class="key">Frecvență observată</div><div class="num" id="hz">0 Hz</div></div>
+<div class="metric"><div class="key">Semnal de șoc filtrat*</div><div class="num" id="shock">—</div></div>
+<div class="metric"><div class="key">Poziții GPS primite</div><div class="num" id="fixes">0</div></div>
+<div class="metric"><div class="key">Precizie GPS raportată</div><div class="num" id="accuracy">—</div></div>
+<div class="metric"><div class="key">Ultima poziție</div><div class="num" id="coord" style="font-size:14px;word-break:break-all">—</div></div>
+</div>
+<p style="font-size:12px">*Semnal de test, NU detector validat de gropi. Folosește accelerația fără gravitație dacă browserul o furnizează; altfel folosește variația normei accelerației totale față de o medie mobilă.</p>
+<canvas id="chart" width="740" height="150" aria-label="Graficul amplitudinii șocurilor recente"></canvas>
+</div>
+<div class="card"><h2>3. Jurnal</h2><div id="log" aria-live="polite">Aștept pornirea.</div></div>
+<div class="card"><h2>Test minim pentru ambele telefoane</h2><p>1. Cu bicicleta oprită: pornește senzorii și mișcă blând telefonul — contorul și graficul trebuie să reacționeze.<br>2. Ieși afară și verifică 2–3 actualizări GPS.<br>3. Înregistrează două treceri pe <b>același segment sigur</b>, cu telefonul bine fixat. Nu traversa intenționat gropi periculoase.<br>4. Exportă CSV și compară punctele de șoc. Nu publica coordonatele personale brute.</p></div>
+<footer>Test orientativ pentru UniHack 2026. Poate funcționa în Safari pe iPhone și Chrome pe Android, dar permisiunile și rata senzorilor depind de browser. Deschide site-ul direct prin HTTPS (nu în iframe / previzualizare CodePen). Ecranul blocat sau aplicația în fundal pot opri înregistrarea.</footer>
+<script>
+(() => {
+ 'use strict';
+ const $ = id => document.getElementById(id);
+ const state = { motionOn:false, gpsOn:false, motionCount:0, gpsCount:0, motionRows:[], gpsRows:[], watchId:null, lastGPS:null, firstClock:0, lastClock:0, prevTime:0, freqTimes:[], lowpass:null, history:[] };
+ function log(message){ const now = new Date().toLocaleTimeString('ro-RO'); const el=$('log'); el.textContent=`[${now}] ${message}\n`+el.textContent.slice(0,4000); }
+ function status(){ $('state').textContent = `Accelero: ${state.motionOn ? 'ACTIV' : 'oprit'} · GPS: ${state.gpsOn ? 'ACTIV' : 'oprit'}`; }
+ const secure = window.isSecureContext;
+ $('secureNotice').textContent = secure ? '✅ Conexiune securizată. Poți solicita acces la senzori și GPS.' : '⚠️ Pagina nu este în context securizat. Public-o prin HTTPS (de exemplu GitHub Pages). Altfel browserul poate bloca senzorii și GPS-ul.';
+ function val(n){ return typeof n==='number'&&Number.isFinite(n) ? n : null; }
+ function onMotion(e){
+   if(!state.motionOn)return;
+   const now=performance.now(), a=e.acceleration, g=e.accelerationIncludingGravity, r=e.rotationRate;
+   let xx=val(a?.x),yy=val(a?.y),zz=val(a?.z);let method='linear';
+   if(xx===null||yy===null||zz===null){xx=val(g?.x);yy=val(g?.y);zz=val(g?.z);method='gravity_included';}
+   if(xx===null||yy===null||zz===null){return;}
+   const mag=Math.hypot(xx,yy,zz);
+   let signal;
+   if(method==='linear'){signal=mag;}else{
+     if(state.lowpass===null)state.lowpass=mag;
+     state.lowpass += 0.05*(mag-state.lowpass);
+     signal=Math.abs(mag-state.lowpass);
+   }
+   state.motionCount++;state.freqTimes.push(now);
+   while(state.freqTimes.length && state.freqTimes[0] < now-2000)state.freqTimes.shift();
+   state.history.push(signal);if(state.history.length>180)state.history.shift();
+   const gps=state.lastGPS;
+   state.motionRows.push({type:'motion',utc:new Date().toISOString(),elapsed_ms:Math.round(now),x:xx,y:yy,z:zz,method,magnitude:mag,shock_signal:signal,rot_alpha:val(r?.alpha),rot_beta:val(r?.beta),rot_gamma:val(r?.gamma),latitude:gps?.lat??'',longitude:gps?.lon??'',accuracy_m:gps?.accuracy??'',gps_age_ms:gps?Math.round(Date.now()-gps.ts):''});
+   if(now-state.lastClock>200){state.lastClock=now;$('samples').textContent=state.motionCount.toLocaleString('ro-RO');$('hz').textContent=(state.freqTimes.length>1?(1000*(state.freqTimes.length-1)/(now-state.freqTimes[0])):0).toFixed(0)+' Hz';$('shock').textContent=signal.toFixed(2);render();}
+ }
+ function render(){
+   const c=$('chart'),ctx=c.getContext('2d'),w=c.width,h=c.height;
+   ctx.clearRect(0,0,w,h);ctx.strokeStyle='#35545b';ctx.lineWidth=1;
+   for(let i=1;i<4;i++){ctx.beginPath();ctx.moveTo(0,i*h/4);ctx.lineTo(w,i*h/4);ctx.stroke();}
+   if(!state.history.length)return;
+   const max=Math.max(5,...state.history)*1.15;
+   ctx.strokeStyle='#53dab0';ctx.lineWidth=2;ctx.beginPath();
+   state.history.forEach((v,i)=>{const x=i/(Math.max(1,state.history.length-1))*w,y=h-10-Math.min(1,v/max)*(h-20);if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y);});ctx.stroke();
+ }
+ $('motionStart').addEventListener('click',async()=>{
+   if(state.motionOn){log('Accelerometrul era deja pornit.');return;}
+   if(typeof window.DeviceMotionEvent==='undefined'){log('DeviceMotionEvent nu este expus în acest browser.');return;}
+   try{
+     // Pe iPhone, apelul trebuie să pornească direct din gestul utilizatorului.
+     const req=typeof DeviceMotionEvent.requestPermission==='function' ? DeviceMotionEvent.requestPermission() : null;
+     if(req){const permission=await req;log('Permisiune mișcare: '+permission);if(permission!=='granted')return;}
+     state.motionOn=true;window.addEventListener('devicemotion',onMotion);status();log('Ascult evenimente devicemotion. Mișcă ușor telefonul.');
+     window.setTimeout(()=>{if(state.motionOn&&state.motionCount===0)log('Niciun eșantion în 3 secunde. Verifică Safari/Chrome, HTTPS și permisiunea Motion & Orientation.');},3000);
+   }catch(err){log('Eroare accelerometru: '+(err?.message||err));}
+ });
+ $('gpsStart').addEventListener('click',()=>{
+   if(state.gpsOn){log('GPS era deja pornit.');return;}
+   if(!navigator.geolocation){log('API geolocation indisponibil.');return;}
+   state.gpsOn=true;status();log('Solicit permisiunea GPS...');
+   state.watchId=navigator.geolocation.watchPosition(p=>{
+     const c=p.coords;const gps={lat:c.latitude,lon:c.longitude,accuracy:c.accuracy,ts:p.timestamp};state.lastGPS=gps;state.gpsCount++;
+     $('fixes').textContent=state.gpsCount;$('accuracy').textContent=Math.round(c.accuracy)+' m';$('coord').textContent=c.latitude.toFixed(6)+', '+c.longitude.toFixed(6);
+     state.gpsRows.push({type:'gps',utc:new Date(p.timestamp).toISOString(),latitude:gps.lat,longitude:gps.lon,accuracy_m:gps.accuracy,speed_mps:val(c.speed),heading_deg:val(c.heading)});
+     if(state.gpsCount<5||state.gpsCount%10===0)log('GPS fix '+state.gpsCount+': precizie '+Math.round(c.accuracy)+' m');
+   },err=>{log('Eroare GPS '+err.code+': '+err.message);if(err.code===1){state.gpsOn=false;status();}}, {enableHighAccuracy:true,maximumAge:0,timeout:15000});
+ });
+ $('stop').addEventListener('click',()=>{
+   state.motionOn=false;window.removeEventListener('devicemotion',onMotion);
+   if(state.watchId!==null){navigator.geolocation.clearWatch(state.watchId);state.watchId=null;}
+   state.gpsOn=false;status();log('Înregistrare oprită. Exportă CSV.');
+ });
+ function csvCell(v){const text=v===null||v===undefined?'':String(v);return '"'+text.replaceAll('"','""')+'"';}
+ function downloadCSV(rows,name){
+   if(!rows.length){log('Nu există date pentru '+name);return;}
+   const fields=[...new Set(rows.flatMap(r=>Object.keys(r)))];const csv='\ufeff'+fields.map(csvCell).join(',')+'\n'+rows.map(r=>fields.map(f=>csvCell(r[f])).join(',')).join('\n');
+   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);
+   const a=document.createElement('a');a.href=url;a.download=name;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),120000);
+   log('Exportat '+name+' ('+rows.length+' rânduri).');
+ }
+ $('export').addEventListener('click',()=>{const d=new Date().toISOString().replace(/[:.]/g,'-');downloadCSV(state.motionRows,'bikeguard_motion_'+d+'.csv');downloadCSV(state.gpsRows,'bikeguard_gps_'+d+'.csv');});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)log('Pagina ascunsă: browserul poate suspenda măsurarea. Ține ecranul deschis.');});
+ status();
+})();
+</script>
+</body></html>

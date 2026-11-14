@@ -34,7 +34,7 @@ export function ComparePage() {
     return [xs, bin(sa), bin(sb)] as [number[], (number | null)[], (number | null)[]];
   }, [sa, sb]);
 
-  if (rides.length < 2) return <div><h1>{t.compare.title}</h1><p>{t.compare.needTwo} <a href="#/import">{t.home.importBtn}</a></p></div>;
+  if (rides.length < 2) return <div><p>{t.compare.needTwo} <a href="#/import">{t.home.importBtn}</a></p></div>;
 
   const opts = rides.map((r) => <option key={r.ride_id} value={r.ride_id}>{r.processed.meta.label || r.file_name} · {fmtLen(r.processed.summary.distance_m)}</option>);
   const rangeCtl = (p: typeof A, r: [number, number] | null, setR: (v: [number, number] | null) => void) => {
@@ -52,7 +52,6 @@ export function ComparePage() {
 
   return (
     <div className="stack">
-      <h1>{t.compare.title}</h1>
       <p className="small muted">Totul vine din măsurători, nimic din estimări. Alege două ture (sau porțiuni) între aceleași puncte, cu același telefon, aceeași bicicletă și același suport.</p>
       <div className="grid2">
         <label>{t.compare.pick1}<select value={a} onChange={(e) => { setA(e.target.value); setRa(null); }}><option value="">—</option>{opts}</select>{rangeCtl(A, ra, setRa)}</label>

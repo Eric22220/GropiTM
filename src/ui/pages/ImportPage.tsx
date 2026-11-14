@@ -1,7 +1,7 @@
 import { Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { DeclaredSurface } from '../../core/types';
-import { importFile } from '../../state/store';
+import { DuplicateRideError, importFile } from '../../state/store';
 import { Banner, Header } from '../kit';
 import { go } from '../App';
 
@@ -10,16 +10,19 @@ export function ImportPage() {
   const [declared, setDeclared] = useState<DeclaredSurface>(null);
   const [busy, setBusy] = useState<{ stage: string; frac: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dup, setDup] = useState<{ msg: string; id: string | null } | null>(null);
 
   const onFile = async (f: File | undefined) => {
     if (!f) return;
     setError(null);
+    setDup(null);
     setBusy({ stage: 'citire fișier', frac: 0.02 });
     try {
       const { ride } = await importFile(f, declared, (stage, frac) => setBusy({ stage, frac }));
       go(ride.shocks.some((s) => s.located) ? `/review/${ride.ride_id}` : `/ride/${ride.ride_id}`);
     } catch (e) {
-      setError((e as Error).message);
+      if (e instanceof DuplicateRideError) setDup({ msg: e.message, id: e.rideId });
+      else setError((e as Error).message);
     } finally {
       setBusy(null);
       if (input.current) input.current.value = '';
@@ -47,6 +50,7 @@ export function ImportPage() {
           <div className="progress" role="progressbar" aria-valuenow={Math.round(busy.frac * 100)} aria-valuemin={0} aria-valuemax={100}><div style={{ width: `${Math.round(busy.frac * 100)}%` }} /></div>
         </div>
       )}
+      {dup && <Banner kind="info">{dup.msg}{dup.id && <div style={{ marginTop: 8 }}><a className="btn sm primary" href={`#/ride/${dup.id}`}>Deschide tura</a></div>}</Banner>}
       {error && <Banner kind="danger"><b>Importul a eșuat.</b> {error}</Banner>}
       <p className="xs muted">Recomandat în Sensor Logger: Accelerometer, Gyroscope, versiunile Uncalibrated și Location, la 100 Hz. Fișierul rămâne doar pe acest telefon.</p>
     </div></main>

@@ -35,10 +35,13 @@ export function useLeaflet(opts: { zoom?: number; center?: [number, number]; onC
   return { ref, map };
 }
 
+/** o hartă eliminată (de ex. la reîncărcarea modulelor) nu mai are panouri: nu mai adăugăm nimic pe ea */
+export const alive = (map: L.Map | null): map is L.Map => !!map && !!map.getPane('overlayPane');
+
 /** un LayerGroup care se reconstruiește când se schimbă dependențele */
 export function useLayerGroup(map: L.Map | null, build: (g: L.LayerGroup) => void, deps: unknown[]) {
   useEffect(() => {
-    if (!map) return;
+    if (!alive(map)) return;
     const g = L.layerGroup().addTo(map);
     build(g);
     return () => { g.remove(); };

@@ -2,6 +2,7 @@
 // utilizatorul schimbă ecranul. La oprire, tura trece prin exact aceeași procesare ca un import.
 import { Recorder, buildZipFromSession, recDelete, type LiveStats } from '../capture/recorder';
 import { importBytes } from '../state/store';
+import { reloadIfSafe } from './update';
 
 let rec: Recorder | null = null;
 let stats: LiveStats | null = null;
@@ -43,6 +44,8 @@ export async function stopRide(onProgress?: (s: string, f: number) => void): Pro
     return { rideId: ride.ride_id, zip, error: null, shocks: ride.shocks.filter((s) => s.located).length };
   } catch (e) {
     return { rideId: null, zip, error: (e as Error).message, shocks: 0 };
+  } finally {
+    setTimeout(() => reloadIfSafe(), 4000); // o actualizare amânată se aplică după tură
   }
 }
 

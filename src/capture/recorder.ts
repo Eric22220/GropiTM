@@ -126,6 +126,8 @@ export class Recorder {
       ax: n(a?.x), ay: n(a?.y), az: n(a?.z),
       ra: n(r?.alpha), rb: n(r?.beta), rg: n(r?.gamma),
     };
+    // unele browsere (de ex. Chrome pe desktop) trimit evenimente goale: nu le numărăm ca date de senzor
+    if (row.agx === null && row.ax === null) return;
     if (this.lastMotionT && t - this.lastMotionT > 500) { this.ev('motion_gap', `${Math.round(t - this.lastMotionT)} ms`); this.problems.add('gol în fluxul senzorilor'); }
     this.lastMotionT = t;
     if (this.allTenth && row.agx !== null && Math.abs(row.agx * 10 - Math.round(row.agx * 10)) > 1e-6) this.allTenth = false;

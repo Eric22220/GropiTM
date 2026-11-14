@@ -141,4 +141,16 @@ describe('export ShockGrid (7.1)', () => {
     expect(r.gyro).toBeNull(); // rg lipsă
     expect(r.events[0].type).toBe('ride_start');
   });
+  it('tură doar cu GPS (fără senzori de mișcare): se importă, fără confort', () => {
+    const gps = Array.from({ length: 60 }, (_, i) => ({ fix_t: 1.8e12 + i * 1000, recv_t: 1.8e12 + i * 1000, lat: 45.75 + i * 4.5e-5, lon: 21.22, acc: 5, alt: null, alt_acc: null, speed: 5, heading: 0 }));
+    const zip = buildShockGridZip({ meta: { ride_uuid: 'gps-only' }, motion: [], gps, events: [] });
+    const r = parseShockGrid(unzipFlat(zip));
+    expect(r.motion.t.length).toBe(0);
+    expect(r.meta.warnings[0]).toMatch(/doar traseul GPS/);
+    const p = processRide(r);
+    expect(p.windows).toHaveLength(0);
+    expect(p.summary.distance_m).toBeGreaterThan(250);
+    expect(p.track.length).toBe(60);
+    expect(() => parseShockGrid(unzipFlat(buildShockGridZip({ meta: {}, motion: [], gps: [], events: [] })))).toThrow(/nici date de mișcare, nici GPS/);
+  });
 });

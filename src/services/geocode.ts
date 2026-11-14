@@ -57,7 +57,8 @@ export function buildStreetIndex(g: Graph): StreetEntry[] {
 }
 
 export function searchStreets(index: StreetEntry[], q: string, limit = 5): Place[] {
-  const k = normalize(q);
+  // numărul casei nu face parte din numele străzii („Strada Paris 2” → „paris”)
+  const k = normalize(q).split(' ').filter((w) => !/^\d+[a-z]?$/.test(w)).join(' ');
   if (k.length < 2) return [];
   const words = k.split(' ');
   const scored: [number, StreetEntry][] = [];

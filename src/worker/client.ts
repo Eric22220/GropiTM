@@ -4,6 +4,10 @@ import type { DeclaredSurface, ProcessedRide } from '../core/types';
 let worker: Worker | null = null;
 let seq = 0;
 
+export function warmWorker() {
+  try { if (!worker) worker = new Worker(new URL('./processing.worker.ts', import.meta.url), { type: 'module' }); } catch { /* se creează la prima folosire */ }
+}
+
 export function processInWorker(
   name: string,
   bytes: ArrayBuffer,

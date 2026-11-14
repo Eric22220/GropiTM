@@ -41,6 +41,9 @@ describe.skipIf(!existsSync('public/data/graph-timisoara.json'))('index local pe
     const r = searchStreets(idx, 'revolutiei');
     expect(r.length).toBeGreaterThan(0);
     expect(normalize(r[0].name)).toContain('revolutiei');
+    const paris = searchStreets(idx, 'Strada Paris 2');
+    expect(paris.length).toBeGreaterThan(0);
+    expect(normalize(paris[0].name)).toContain('paris');
   });
 });
 

@@ -27,6 +27,8 @@ export interface Settings {
   profile: ProfileKey;
   showReview: boolean;
   showZones: boolean;
+  /** stilul hărții de fundal: auto = estompată în modul întunecat */
+  mapStyle: 'auto' | 'light' | 'dark';
 }
 
 export interface ImportReport {
@@ -78,6 +80,7 @@ const defaultSettings: Settings = {
   profile: 'balanced',
   showReview: false,
   showZones: true,
+  mapStyle: 'auto',
 };
 
 let state: AppState = {
@@ -136,6 +139,9 @@ function recompute(rides = state.rides) {
 }
 
 export const lengthOf = (e: number) => state.graph?.length[e] ?? 0;
+
+/** doar pentru teste: graful fără fetch */
+export function _testSetGraph(g: Graph | null) { set({ graph: g, graphStatus: g ? 'ready' : 'missing' }); router = null; compCache.clear(); }
 
 // ---------------- inițializare ----------------
 export async function init() {
@@ -247,7 +253,9 @@ function routeChangeText(before: RoutePair, after: RoutePair, diff: LayerDiff): 
   };
 }
 
-export class DuplicateRideError extends ImportError {}
+export class DuplicateRideError extends ImportError {
+  constructor(msg: string, readonly rideId: string | null) { super(msg); }
+}
 
 export async function importFile(file: File, declared: DeclaredSurface, onProgress?: (stage: string, frac: number) => void): Promise<{ ride: ProcessedRide; report: ImportReport }> {
   const bytes = await file.arrayBuffer();
@@ -256,8 +264,8 @@ export async function importFile(file: File, declared: DeclaredSurface, onProgre
 
 export async function importBytes(name: string, bytes: ArrayBuffer, declared: DeclaredSurface, onProgress?: (stage: string, frac: number) => void) {
   const p = await processInWorker(name, bytes, state.settings.cfg, declared, onProgress);
-  if (state.rides.some((r) => r.ride_id === p.ride_id)) throw new DuplicateRideError('Tura a fost deja importată pe acest dispozitiv; trecerile nu se numără de două ori.');
-  if (state.snapshot?.meta.ride_ids.includes(p.ride_id)) throw new DuplicateRideError('Tura face deja parte din stratul publicat (snapshot); nu se importă din nou.');
+  if (state.rides.some((r) => r.ride_id === p.ride_id)) throw new DuplicateRideError('Tura e deja importată pe acest telefon; nu o adăugăm a doua oară, ca trecerile să nu se numere de două ori.', p.ride_id);
+  if (state.snapshot?.meta.ride_ids.includes(p.ride_id)) throw new DuplicateRideError('Tura face deja parte din datele publicate de echipă; nu se importă din nou.', null);
   if (state.graph) { onProgress?.('potrivire pe hartă', 0.92); matchProcessed(p, state.graph, state.settings.cfg, declared); }
   const before = state.layer;
   const routeBefore = computeRoutes(before);

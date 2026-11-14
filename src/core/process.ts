@@ -24,8 +24,8 @@ export function summarize(raw: RawRide, sig: Signal | null, dist: { total: numbe
   }
   const dtMed = dts.length ? median(dts) : NaN;
   const accs = raw.gps.map((f) => f.acc).filter((a): a is number => a !== null);
-  const dur = n > 1 ? (t[n - 1] - t[0]) / 1000 : 0;
   const gpsDur = raw.gps.length > 1 ? (raw.gps[raw.gps.length - 1].t - raw.gps[0].t) / 1000 : 0;
+  const dur = n > 1 ? (t[n - 1] - t[0]) / 1000 : gpsDur; // tură doar cu GPS: durata din fixuri
   return {
     duration_s: dur,
     n_motion: n,

@@ -1,6 +1,7 @@
-import { BookOpen, Database, Flag, Lock, Wrench } from 'lucide-react';
+import { BookOpen, Database, Flag, Lock, RefreshCw, Wrench } from 'lucide-react';
+import { checkForUpdate, reloadIfSafe } from '../../services/update';
 import { useApp } from '../../state/store';
-import { Item } from '../kit';
+import { Item, toast } from '../kit';
 
 export function MorePage() {
   const reports = useApp((s) => s.reports);
@@ -20,7 +21,16 @@ export function MorePage() {
       <div className="list">
         <Item href="#/more/advanced" icon={<Wrench />} tone="warn" title="Instrumente avansate" sub="Diagnostic senzori, parametri, validare" />
       </div>
-      <p className="xs muted" style={{ textAlign: 'center', marginTop: 24 }}>ShockGrid {__APP_VERSION__} · UniHack 2026 · cod MIT, date © OpenStreetMap contributors (ODbL)</p>
+      <div className="section-label">Aplicația</div>
+      <div className="list">
+        <Item icon={<RefreshCw />} title="Caută actualizări" sub={`Versiunea ${__APP_VERSION__} · ${__BUILD_TIME__.replace('T', ' ')} UTC`} onClick={async () => {
+          toast('Se verifică…');
+          const r = await checkForUpdate();
+          if (r === 'pending') { toast('Versiune nouă instalată. Se reîncarcă…'); if (!reloadIfSafe()) toast('Versiune nouă instalată: se aplică după tura sau raportul în curs.'); }
+          else toast(r === 'current' ? 'Ai cea mai nouă versiune.' : 'Verificarea nu e disponibilă acum (fără internet?).');
+        }} />
+      </div>
+      <p className="xs muted" style={{ textAlign: 'center', marginTop: 24 }}>ShockGrid · UniHack 2026 · cod MIT, date © OpenStreetMap contributors (ODbL)</p>
     </div></main>
   );
 }

@@ -57,7 +57,6 @@ export function parseShockGrid(files: FileMap): RawRide {
       kg++;
     }
   }
-  if (k < 10) throw new ImportError('motion.csv nu conține date de accelerație.');
   const gps: GpsFix[] = [];
   const gf = findFile(files, 'gps.csv');
   if (gf) {
@@ -84,6 +83,10 @@ export function parseShockGrid(files: FileMap): RawRide {
       if (Number.isFinite(t)) events.push({ t, type: r[ity] ?? '', detail: id >= 0 ? r[id] : undefined });
     }
   }
+  // fără senzori de mișcare (permisiune refuzată / browser fără IMU): tura păstrează doar traseul GPS
+  const motionless = k < 10;
+  if (motionless && !gps.length) throw new ImportError('Tura nu conține nici date de mișcare, nici GPS.');
+  if (motionless) k = 0;
   const meta: RideMeta = {
     source: 'shockgrid',
     ride_key: `shockgrid:${metaJson.ride_uuid ?? metaJson.start ?? T[0]}`,
@@ -91,14 +94,14 @@ export function parseShockGrid(files: FileMap): RawRide {
     device: metaJson.device,
     platform: metaJson.platform,
     app_version: metaJson.app_version,
-    start_ms: T[0],
-    stop_ms: T[k - 1],
+    start_ms: k ? T[0] : gps[0].t,
+    stop_ms: k ? T[k - 1] : gps[gps.length - 1].t,
     orientation_aware: withGravity,
     motion_clock: metaJson.motion_clock,
     bike: metaJson.bike,
     mount: metaJson.mount,
     declared_surface: metaJson.declared_surface ?? null,
-    warnings: withGravity ? [] : ['Fișier fără accelerationIncludingGravity: se folosește |acceleration| (orientation_aware = false).'],
+    warnings: motionless ? ['Fără date de la senzorii de mișcare (permisiune refuzată sau indisponibili): tura are doar traseul GPS, deci nu calculăm confortul.'] : withGravity ? [] : ['Fișier fără accelerationIncludingGravity: se folosește |acceleration| (orientation_aware = false).'],
     extra: { user_agent: String(metaJson.user_agent ?? ''), resolution: String(metaJson.observed_resolution ?? '') },
   };
   return {

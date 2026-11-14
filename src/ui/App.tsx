@@ -1,6 +1,8 @@
 import { Bike, Map as MapIcon, Menu, Navigation } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { rideActive, subscribeRide } from '../services/ride';
+import { subscribeUpdate, updatePending } from '../services/update';
+import { useApp } from '../state/store';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Header, Toaster } from './kit';
 import { AdvancedPage } from './pages/AdvancedPage';
@@ -46,6 +48,8 @@ export function App() {
   const [, base = '', arg, arg2] = pathname.split('/');
   const params = new URLSearchParams(query);
   const recording = useSyncExternalStore(subscribeRide, rideActive);
+  const mapStyle = useApp((s) => s.settings.mapStyle);
+  const updateReady = useSyncExternalStore(subscribeUpdate, updatePending);
   let page: JSX.Element;
   let tab: Tab = 'map';
   let navHidden = false;
@@ -55,9 +59,9 @@ export function App() {
     case 'rides': tab = 'rides'; page = <RidesPage />; break;
     case 'import': tab = 'rides'; page = <ImportPage />; break;
     case 'record': tab = 'rides'; navHidden = true; page = <RecordScreen />; break;
-    case 'ride': tab = 'rides'; page = arg2 === 'replay' ? <main className="screen"><div className="wrap"><Header title="" back={`#/ride/${arg}`} /><ReplayPage id={arg} /></div></main> : <RideDetail id={arg} />; break;
+    case 'ride': tab = 'rides'; page = arg2 === 'replay' ? <main className="screen"><div className="wrap"><Header title="Grafic vibrații" back={`#/ride/${arg}`} /><ReplayPage id={arg} /></div></main> : <RideDetail id={arg} />; break;
     case 'review': tab = 'rides'; page = <ReviewScreen id={arg} />; break;
-    case 'compare': tab = 'rides'; page = <main className="screen"><div className="wrap"><Header title="" back="#/rides" /><ComparePage /></div></main>; break;
+    case 'compare': tab = 'rides'; page = <main className="screen"><div className="wrap"><Header title="Compară ture" back="#/rides" /><ComparePage /></div></main>; break;
     case 'report': tab = 'map'; navHidden = true; page = <ReportScreen id={arg} quick={params.get('quick') === '1'} lat={Number(params.get('lat'))} lon={Number(params.get('lon'))} />; break;
     case 'reports': tab = 'more'; page = <ReportsPage />; break;
     case 'more':
@@ -67,7 +71,7 @@ export function App() {
     default: page = <MapScreen />;
   }
   return (
-    <div className="app">
+    <div className={`app tiles-${mapStyle}`}>
       <ErrorBoundary resetKey={pathname}>{page}</ErrorBoundary>
       {!navHidden && (
         <nav className="nav" aria-label="Navigare principală">
@@ -80,6 +84,7 @@ export function App() {
           ))}
         </nav>
       )}
+      {updateReady && <button className="update-pill" onClick={() => location.reload()}>Versiune nouă instalată · Reîncarcă</button>}
       <Toaster />
     </div>
   );

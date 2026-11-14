@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Thresholds } from '../../core/aggregate';
 import { DEFAULT_CONFIG } from '../../core/config';
 import { t } from '../../i18n/ro';
-import { updateSettings, useApp, wipeAll } from '../../state/store';
+import { updateSettings, useApp } from '../../state/store';
 
 export function SettingsPage() {
   const settings = useApp((s) => s.settings);
@@ -11,13 +11,8 @@ export function SettingsPage() {
   const [msg, setMsg] = useState<string | null>(null);
   return (
     <div className="stack">
-      <div className="card stack">
-        <h2 style={{ marginTop: 0 }}>Datele locale</h2>
-        <p className="small">Șterge toate turele, rezultatele și setările de pe acest dispozitiv. Nu se poate anula.</p>
-        <button className="btn danger block" onClick={async () => { if (confirm('Ștergi TOATE datele locale ShockGrid de pe acest dispozitiv? Nu se poate anula.')) { await wipeAll(); setMsg('Toate datele locale au fost șterse.'); } }}>Șterge toate datele locale</button>
-      </div>
-      <label className="switch"><input type="checkbox" checked={settings.developer} onChange={(e) => updateSettings({ developer: e.target.checked })} />Modul Developer</label>
-      {settings.developer && (
+      <p className="small muted">Ștergerea tuturor datelor locale e în Mai mult → Confidențialitate.</p>
+      {(
         <div className="card stack">
           <h2 style={{ marginTop: 0 }}>VibrationConfig</h2>
           <p className="small muted">Valorile [EXPERIMENTAL] sunt puncte de plecare. După modificare, turele se reprocesează din „Ture → Reprocesează”. Schimbă și processing_version.</p>

@@ -19,14 +19,15 @@ export default defineConfig(({ command }) => ({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false, // înregistrare proprie (src/services/update.ts): reîncărcarea se amână în timpul unei ture
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'ShockGrid — confortul velo în Timișoara',
         short_name: 'ShockGrid',
         description: 'Harta confortului pe bicicletă din vibrații măsurate, comparare de trasee și ruta cea mai netedă.',
         lang: 'ro',
-        theme_color: '#0b3d5c',
-        background_color: '#ffffff',
+        theme_color: '#1857f5',
+        background_color: '#f4f6fa',
         display: 'standalone',
         scope: BASE,
         start_url: BASE,

@@ -16,6 +16,9 @@ import { go } from '../App';
 
 type Sel = { edge?: EdgeAgg; zone?: ShockZone; report?: LocalReport; layers?: true } | null;
 
+// dacă utilizatorul a pornit „Locația mea”, rămâne pornită când revine pe hartă (în aceeași sesiune)
+let rememberLoc = false;
+
 export function MapScreen({ focus }: { focus?: string }) {
   const graph = useApp((s) => s.graph);
   const graphStatus = useApp((s) => s.graphStatus);
@@ -26,7 +29,8 @@ export function MapScreen({ focus }: { focus?: string }) {
   const snapshot = useApp((s) => s.snapshot);
   const recording = useSyncExternalStore(subscribeRide, rideActive);
   const [sel, setSel] = useState<Sel>(null);
-  const [locOn, setLocOn] = useState(false);
+  const [locOn, setLocOnState] = useState(rememberLoc);
+  const setLocOn = (v: boolean) => { rememberLoc = v; setLocOnState(v); };
   const [follow, setFollow] = useState(false);
   const [showTracks, setShowTracks] = useState(!!focus);
   const loc = useLocation(locOn);
@@ -50,7 +54,9 @@ export function MapScreen({ focus }: { focus?: string }) {
 
   const onLocate = () => {
     if (!locOn) { setLocOn(true); setFollow(true); return; }
-    if (loc.fix && map) { map.setView([loc.fix.lat, loc.fix.lon], Math.max(map.getZoom(), 16)); setFollow(true); return; }
+    if (follow) { setFollow(false); return; } // a doua apăsare oprește urmărirea; poziția rămâne afișată
+    if (loc.fix && map) map.setView([loc.fix.lat, loc.fix.lon], Math.max(map.getZoom(), 16));
+    setFollow(true);
   };
   const LocIcon = !locOn ? Locate : loc.status === 'denied' || loc.status === 'unsupported' || loc.status === 'insecure' ? LocateOff : LocateFixed;
 
@@ -64,16 +70,17 @@ export function MapScreen({ focus }: { focus?: string }) {
         <button className="icon-btn" onClick={() => setSel({ layers: true })} aria-label="Straturi și legendă"><Layers /></button>
       </div>
       <div className="map-side">
-        <button className={`icon-btn ${follow && loc.fix ? 'following' : locOn ? 'active' : ''}`} onClick={onLocate} aria-label={follow ? 'Urmăresc poziția ta' : 'Locația mea'} aria-pressed={follow}>
+        <button className={`icon-btn ${follow && loc.fix ? 'following' : locOn ? 'active' : ''}`} onClick={onLocate} aria-label={!locOn ? 'Arată locația mea' : follow ? 'Oprește urmărirea poziției' : 'Centrează pe locația mea și urmărește'} aria-pressed={follow}>
           <LocIcon />
         </button>
-        {follow && <button className="icon-btn" onClick={() => { setFollow(false); setLocOn(false); }} aria-label="Oprește urmărirea poziției"><LocateOff /></button>}
       </div>
       <div className="map-chip">
         {recording ? (
           <a className="chip live" href="#/record"><span className="rec-dot" aria-hidden="true" /> Tură în curs</a>
         ) : locOn && loc.message ? (
           <span className="chip" role="status">{loc.message}</span>
+        ) : graphStatus === 'loading' ? (
+          <span className="chip" role="status">Se încarcă străzile…</span>
         ) : graphStatus === 'ready' && measured === 0 && !sel ? (
           <button className="chip" onClick={() => setSel({ layers: true })}>Încă nu sunt străzi măsurate</button>
         ) : null}
@@ -95,6 +102,11 @@ export function MapScreen({ focus }: { focus?: string }) {
               <div className="legend-row"><span className="legend-line" style={{ background: 'var(--surface-3)' }} /><span>Fără culoare: încă nemăsurat (nu înseamnă neted)</span></div>
               <div className="legend-row"><span className="legend-line" style={{ background: '#e8590c', height: 12, width: 12, borderRadius: 6, marginLeft: 9, marginRight: 9 }} /><span>Posibilă denivelare detectată</span></div>
               <div className="legend-row"><span className="legend-line" style={{ background: '#c2261b', height: 14, width: 14, borderRadius: 4, marginLeft: 8, marginRight: 8 }} /><span>Rapoartele tale (doar pe acest telefon)</span></div>
+            </div>
+            <div className="field"><span>Hartă de fundal</span>
+              <div className="seg" role="group" aria-label="Stilul hărții de fundal">
+                {([['auto', 'Automat'], ['light', 'Luminoasă'], ['dark', 'Întunecată']] as const).map(([k, l]) => <button key={k} aria-pressed={settings.mapStyle === k} onClick={() => updateSettings({ mapStyle: k })}>{l}</button>)}
+              </div>
             </div>
             <label className="switch"><input type="checkbox" checked={settings.showZones} onChange={(e) => updateSettings({ showZones: e.target.checked })} />Posibile denivelări</label>
             <label className="switch"><input type="checkbox" checked={showTracks} onChange={(e) => setShowTracks(e.target.checked)} />Traseele turelor mele</label>

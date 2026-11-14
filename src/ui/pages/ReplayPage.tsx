@@ -40,7 +40,7 @@ export function ReplayPage({ id }: { id?: string }) {
     return [xs, v.map((x) => (Number.isFinite(x) ? x : null)), rms] as [number[], (number | null)[], (number | null)[]];
   }, [p]);
 
-  if (!p) return <div><h1>Replay</h1><p>Tura nu există pe acest dispozitiv. <a href="#/rides">{t.nav.rides}</a></p></div>;
+  if (!p) return <div><p>Tura nu există pe acest dispozitiv. <a href="#/rides">{t.nav.rides}</a></p></div>;
 
   const onCursor = (idx: number | null) => {
     if (idx === null || !track || !marker.current) return;
@@ -51,7 +51,7 @@ export function ReplayPage({ id }: { id?: string }) {
 
   return (
     <div className="stack">
-      <h1>Replay: {p.meta.label || ride!.file_name}</h1>
+      <p style={{ fontWeight: 650, margin: 0 }}>{p.meta.label || ride!.file_name}</p>
       <p className="small muted">Mișcă cursorul pe grafic: punctul portocaliu arată poziția pe hartă. Semnalul e a_v filtrat trece-sus ({'>'} 4 Hz), max-abs pe 40 ms; linia verde e rms_v pe ferestrele valide.</p>
       {sigData && (
         <UPlot

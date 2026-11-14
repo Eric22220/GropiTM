@@ -1,16 +1,16 @@
-import { ArrowDownUp, ArrowLeft, Bike, Check, Clock, History, LocateFixed, MapPin, Navigation, Search, Square, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ProfileKey } from '../../core/route';
+import { ArrowDownUp, ArrowLeft, Bike, Check, History, LocateFixed, Map as MapIcon, MapPin, Navigation, Search, Square, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { ProfileKey, RouteOptions } from '../../core/route';
 import { planRoutes, type PlanResult, type RouteOptionView } from '../../core/routeplan';
 import { haversine, pointSegment, TM_PROJ } from '../../core/geo';
 import { requestMotionPermission } from '../../capture/recorder';
 import { geocoder, GeocodeError, buildStreetIndex, nearestStreetName, searchStreets, type Place, type StreetEntry } from '../../services/geocode';
-import { locationPermission } from '../../services/location';
+import { locationPermission, type LocState } from '../../services/location';
 import { startRide } from '../../services/ride';
-import { addRecent, clearRecent, getRouter, setPlan, snapNode, useApp } from '../../state/store';
+import { addRecent, clearRecent, getRouter, setPlan, snapNode, updateSettings, useApp } from '../../state/store';
 import { t } from '../../i18n/ro';
 import { CLASS_COLORS, fmtLen } from '../format';
-import { Banner, Sheet, toast, useDebounced } from '../kit';
+import { Banner, SnapSheet, toast, useDebounced, type Snap } from '../kit';
 import { drawComfort, pinIcon, routeLatLngs } from '../map/draw';
 import { useLocation, useMeLayer } from '../map/me';
 import { L, useLayerGroup, useLeaflet } from '../map/useLeaflet';
@@ -30,6 +30,8 @@ export function RouteScreen({ focus }: { focus: string | null }) {
   const [picking, setPicking] = useState<'origin' | 'dest' | null>(null);
   const [selected, setSelected] = useState<ProfileKey>('shortest');
   const [nav, setNav] = useState(false);
+  const [snap, setSnap] = useState<Snap>('peek');
+  const [sheetH, setSheetH] = useState(200);
   const usesMe = plan.origin?.kind === 'mylocation' || plan.dest?.kind === 'mylocation';
   const loc = useLocation(usesMe || nav);
   const [originFix, setOriginFix] = useState<[number, number] | null>(null);
@@ -77,17 +79,16 @@ export function RouteScreen({ focus }: { focus: string | null }) {
     if (routePts.length) {
       L.polyline(routePts, { color: '#ffffff', weight: 10, opacity: 0.9, interactive: false }).addTo(g);
       const pl = L.polyline(routePts, { color: '#1857f5', weight: 6, opacity: 1, interactive: false }).addTo(g);
-      const key = `${A}|${B}`;
-      if (fitted.current !== key && !nav) {
-        const mapBox = map!.getContainer().getBoundingClientRect();
-        const sheetTop = document.querySelector('.sheet')?.getBoundingClientRect().top ?? mapBox.bottom - mapBox.height * 0.45;
-        map!.fitBounds(pl.getBounds(), { paddingTopLeft: [30, 140], paddingBottomRight: [30, Math.max(40, Math.round(mapBox.bottom - sheetTop + 24))], maxZoom: 17 });
+      const key = `${A}|${B}|${chosen?.key}|${snap}|${Math.round(sheetH / 8)}`;
+      if (fitted.current !== key && !nav && snap !== 'full') {
+        const top = 30 + (document.querySelector('.planner')?.getBoundingClientRect().bottom ?? 120);
+        map!.fitBounds(pl.getBounds(), { paddingTopLeft: [28, top], paddingBottomRight: [28, sheetH + 24], maxZoom: 17 });
         fitted.current = key;
       }
     }
     if (A) L.marker(A, { icon: pinIcon('A', '#1857f5') }).addTo(g);
     if (B) L.marker(B, { icon: pinIcon('B', '#c2261b') }).addTo(g);
-  }, [graph, result, chosen?.key, nav]);
+  }, [graph, result, chosen?.key, nav, snap, sheetH]);
 
   // ---- alegerea pe hartă ----
   const [pickLabel, setPickLabel] = useState<string>('');
@@ -173,7 +174,7 @@ export function RouteScreen({ focus }: { focus: string | null }) {
       {nav && (
         <div className="planner" style={{ padding: 12 }}>
           <div className="grow">
-            <div className="small muted">Spre {plan.dest?.name}</div>
+            <div className="small muted">Te urmărim pe ruta spre {plan.dest?.name} · fără indicații de viraj</div>
             <div style={{ fontSize: 22, fontWeight: 700 }}>{navInfo ? (navInfo.arrived ? 'Ai ajuns' : `${fmtLen(navInfo.rem)} · ${Math.max(1, Math.round(navInfo.rem / 250))} min`) : loc.message ?? 'Se caută poziția…'}</div>
             {navInfo?.off && <div className="small" style={{ color: 'var(--warn)', fontWeight: 600 }}>Ești în afara rutei</div>}
           </div>
@@ -184,60 +185,100 @@ export function RouteScreen({ focus }: { focus: string | null }) {
       {!picking && !nav && (
         <RouteSheet
           plan={plan} result={result} selected={selected} onSelect={setSelected} graphReady={!!graph}
-          waitingGps={usesMe && !originFix} locMessage={loc.message}
+          waitingGps={usesMe && !originFix} loc={loc} snap={snap} onSnap={setSnap} onHeight={setSheetH}
           onStart={startNav} onRecenter={() => { if (loc.fix) setOriginFix([loc.fix.lat, loc.fix.lon]); }}
+          onEditOrigin={() => setEditing('origin')} onClear={() => { void setPlan({ ...plan, dest: null }); setSnap('peek'); }}
+          route={settings.route}
         />
       )}
     </main>
   );
 }
 
-function RouteSheet({ plan, result, selected, onSelect, graphReady, waitingGps, locMessage, onStart, onRecenter }: {
+function RouteSheet({ plan, result, selected, onSelect, graphReady, waitingGps, loc, snap, onSnap, onHeight, onStart, onRecenter, onEditOrigin, onClear, route }: {
   plan: { origin: Place | null; dest: Place | null }; result: PlanResult | null; selected: ProfileKey; onSelect: (k: ProfileKey) => void; graphReady: boolean;
-  waitingGps: boolean; locMessage: string | null; onStart: (record: boolean) => void; onRecenter: () => void;
+  waitingGps: boolean; loc: LocState; snap: Snap; onSnap: (s: Snap) => void; onHeight: (h: number) => void;
+  onStart: (record: boolean) => void; onRecenter: () => void; onEditOrigin: () => void; onClear: () => void; route: RouteOptions;
 }) {
-  if (!plan.dest || !plan.origin) {
-    return (
-      <Sheet title="Planifică un traseu">
-        <p className="small muted">Alege de unde pleci și unde mergi. Îți arătăm cea mai scurtă rută și, unde avem măsurători, una mai confortabilă.</p>
-      </Sheet>
-    );
+  const simple = (title: string, body: ReactNode) => (
+    <SnapSheet label={title} snap="peek" onSnap={() => {}} onHeight={onHeight} peek={<div className="stack" style={{ paddingTop: 2 }}><h2 className="sheet-title">{title}</h2>{body}</div>} />
+  );
+  if (!plan.dest || !plan.origin) return simple('Planifică un traseu', <p className="small muted">Alege de unde pleci și unde mergi. Îți arătăm cea mai scurtă rută și, unde avem măsurători, una mai confortabilă.</p>);
+  if (!graphReady) return simple('Se încarcă străzile…', <div className="skeleton" aria-hidden="true" />);
+  if (waitingGps) {
+    const failed = loc.status === 'denied' || loc.status === 'unsupported' || loc.status === 'insecure' || loc.status === 'unavailable' || loc.status === 'timeout';
+    return simple(failed ? 'Nu avem locația ta' : 'Se caută locația ta…', <>
+      <p className="small muted">{loc.message ?? 'Așteptăm primul semnal GPS.'}</p>
+      {failed && <button className="btn primary block" onClick={onEditOrigin}><MapPin /> Alege punctul de plecare</button>}
+    </>);
   }
-  if (!graphReady) return <Sheet title="Se încarcă străzile…"><p className="small muted">Harta străzilor se descarcă o singură dată.</p></Sheet>;
-  if (waitingGps) return <Sheet title="Se caută locația ta…"><p className="small muted">{locMessage ?? 'Așteptăm primul semnal GPS.'}</p></Sheet>;
   if (!result) return null;
-  if (result.error) return <Sheet title="Nu am găsit o rută"><Banner kind="warn">{result.error}</Banner></Sheet>;
+  if (result.error) return simple('Nu am găsit o rută', <><Banner kind="warn">{result.error}</Banner><button className="btn block" onClick={onEditOrigin}>Schimbă pornirea</button></>);
   const v = result.verdict;
+  const chosen = result.options.find((o) => o.key === selected) ?? result.options[0];
+  const recommended = v.kind === 'better' && chosen.key === v.best;
+  const evidence = v.kind === 'nodata'
+    ? { tone: 'warn', text: 'Fără măsurători de confort pe această rută' }
+    : v.kind === 'insufficient'
+      ? { tone: 'warn', text: `Măsurat ${Math.round(chosen.s.measured_pct)}% · prea puțin pentru o recomandare` }
+      : { tone: 'comfort', text: `Măsurat ${Math.round(chosen.s.measured_pct)}%${chosen.knownGoodPct !== null ? ` · ${Math.round(chosen.knownGoodPct)}% confortabil` : ''}` };
+  const problems = chosen.problems.zones + chosen.problems.reports;
+  const peek = (
+    <div>
+      <div className="row nowrap spread" style={{ alignItems: 'flex-start' }}>
+        <div className="grow">
+          <h2 className="sheet-title">Spre {plan.dest.name}</h2>
+          <div className="route-headline num">
+            <b>{Math.max(1, Math.round(chosen.s.minutes))} min</b>
+            <span>{fmtLen(chosen.s.length)}</span>
+            {problems > 0 && <span className="badge danger">{problems} {problems === 1 ? 'problemă' : 'probleme'}</span>}
+          </div>
+        </div>
+        <button className="icon-btn flat sm" onClick={onClear} aria-label="Închide ruta"><X /></button>
+      </div>
+      <div className="row" style={{ margin: '6px 0 12px', gap: 6 }}>
+        <span className={`badge ${evidence.tone}`}>{evidence.text}</span>
+        {result.options.length > 1 && <span className="badge primary">{recommended ? `Recomandată: ${PROFILE_LABEL[chosen.key].toLowerCase()}` : PROFILE_LABEL[chosen.key]}</span>}
+      </div>
+      <div className="grid2">
+        <button className="btn primary" onClick={() => onStart(false)}><Navigation /> Urmărește-mă</button>
+        <button className="btn" onClick={() => onStart(true)}><Bike /> Înregistrează</button>
+      </div>
+    </div>
+  );
   return (
-    <Sheet title={`Spre ${plan.dest.name}`} label="Rute">
+    <SnapSheet label="Rute" snap={snap} onSnap={onSnap} onHeight={onHeight} peek={peek}>
       <div className="stack">
-        {plan.dest.detail && <p className="small muted" style={{ marginTop: -6 }}>{plan.dest.detail}</p>}
         <Banner kind={v.kind === 'better' ? 'ok' : v.kind === 'same' ? 'info' : 'warn'}>{v.text}</Banner>
         <div role="radiogroup" aria-label="Alternative de rută">
-          {result.options.map((o) => <RouteCard key={o.key} o={o} on={o.key === selected} onClick={() => onSelect(o.key)} />)}
+          {result.options.map((o) => <RouteCard key={o.key} o={o} on={o.key === chosen.key} recommended={v.kind === 'better' && o.key === v.best} onClick={() => onSelect(o.key)} />)}
         </div>
-        <div className="grid2">
-          <button className="btn primary lg" onClick={() => onStart(false)}><Navigation /> Pornește</button>
-          <button className="btn lg" onClick={() => onStart(true)}><Bike /> Pornește + tură</button>
+        {result.options.length === 1 && v.kind !== 'better' && <p className="xs muted">Alternativele mai lungi nu sunt afișate: fără măsurători nu putem spune că sunt mai confortabile.</p>}
+        <div className="section-label" style={{ marginTop: 18 }}>Ce poți face</div>
+        <div className="list">
+          <div className="item"><span className="ic"><MapIcon /></span><span className="grow"><div className="t">Vezi ruta</div><div className="s wrap">Doar pe hartă — ce faci acum.</div></span></div>
+          <div className="item"><span className="ic primary"><Navigation /></span><span className="grow"><div className="t">Urmărește-mă</div><div className="s wrap">Punctul tău albastru pe rută și distanța rămasă. Fără indicații de viraj.</div></span></div>
+          <div className="item"><span className="ic comfort"><Bike /></span><span className="grow"><div className="t">Înregistrează</div><div className="s wrap">Pornește o tură care măsoară vibrațiile. Ecranul rămâne aprins.</div></span></div>
         </div>
-        <details className="xs muted">
-          <summary>Ce fac butoanele · confort ≠ siguranță</summary>
-          „Pornește” îți arată poziția pe rută și distanța rămasă (fără indicații vocale). „Pornește + tură” înregistrează și vibrațiile, cu ecranul aprins. Confortul nu înseamnă siguranță: alege mereu drumul pe care îl consideri sigur.
+        <p className="xs muted">Confortul nu înseamnă siguranță: alege mereu drumul pe care îl consideri sigur.</p>
+        {plan.origin.kind === 'mylocation' && <button className="btn sm ghost block" onClick={onRecenter}>Pornește de la poziția mea actuală</button>}
+        <details className="card">
+          <summary>Opțiuni de rutare</summary>
+          <label className="switch"><input type="checkbox" checked={route.allowSidewalks} onChange={(e) => updateSettings({ route: { ...route, allowSidewalks: e.target.checked } })} />Permite trotuarele fără marcaj pentru biciclete</label>
+          <label className="switch"><input type="checkbox" checked={route.useOsmSurface} onChange={(e) => updateSettings({ route: { ...route, useOsmSurface: e.target.checked } })} />Ține cont de pavajul declarat în OpenStreetMap (estimat, nu măsurat)</label>
+          <p className="xs muted">Străzile nemăsurate primesc o penalizare neutră; șocurile punctuale nu intră în cost (sunt deja în indicele de vibrație).</p>
         </details>
-        {plan.origin.kind === 'mylocation' && <button className="btn sm ghost block" onClick={onRecenter}>Actualizează pornirea la poziția curentă</button>}
       </div>
-    </Sheet>
+    </SnapSheet>
   );
 }
 
-function RouteCard({ o, on, onClick }: { o: RouteOptionView; on: boolean; onClick: () => void }) {
+function RouteCard({ o, on, recommended, onClick }: { o: RouteOptionView; on: boolean; recommended: boolean; onClick: () => void }) {
   const known = Object.values(o.knownByClass).reduce((a, b) => a + b, 0);
   return (
     <button className="route-card" role="radio" aria-checked={on} aria-pressed={on} onClick={onClick}>
-      <div className="row spread nowrap">
-        <div><div className="small muted" style={{ fontWeight: 650 }}>{PROFILE_LABEL[o.key]}</div><div className="big num">{Math.max(1, Math.round(o.s.minutes))} min</div></div>
-        <div style={{ textAlign: 'right' }}><div className="num" style={{ fontWeight: 650 }}>{fmtLen(o.s.length)}</div><div className="xs muted"><Clock size={12} style={{ verticalAlign: -1 }} /> la 15 km/h</div></div>
-      </div>
+      <div className="small" style={{ fontWeight: 650, color: 'var(--fg-2)' }}>{PROFILE_LABEL[o.key]}{recommended && <span className="badge comfort" style={{ marginLeft: 6 }}>recomandată</span>}</div>
+      <div className="big num">{Math.max(1, Math.round(o.s.minutes))} min <span className="muted" style={{ fontSize: 15, fontWeight: 600 }}>· {fmtLen(o.s.length)}</span></div>
       <div className="bar" style={{ margin: '10px 0 6px' }} aria-hidden="true">
         {(['A', 'B', 'C', 'D', 'E'] as const).map((c) => <i key={c} style={{ width: `${(100 * o.knownByClass[c]) / o.s.length}%`, background: CLASS_COLORS[c] }} />)}
       </div>

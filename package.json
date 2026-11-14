@@ -24,7 +24,8 @@
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "uplot": "^1.6.30"
+    "uplot": "^1.6.30",
+    "workbox-window": "^7.4.1"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.12",

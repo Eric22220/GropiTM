@@ -32,11 +32,13 @@ export function RideDetail({ id }: { id?: string }) {
       <p className="small muted" style={{ marginTop: -8 }}>{new Date(p.meta.start_ms).toLocaleString('ro-RO', { dateStyle: 'full', timeStyle: 'short' })} · {p.meta.source === 'sensorlogger' ? 'importată din Sensor Logger' : 'înregistrată în ShockGrid'}</p>
       <div className="grid3">
         <Stat v={fmtLen(s.distance_m)} l="distanță" />
-        <Stat v={`${Math.round(s.duration_s / 60)}`} unit="min" l="durată" />
+        <Stat v={s.duration_s < 60 ? '<1' : `${Math.round(s.duration_s / 60)}`} unit="min" l="durată" />
         <Stat v={s.speed_median ? fmt(s.speed_median * 3.6, 0) : '—'} unit="km/h" l="viteză tipică" />
       </div>
       {lastImport?.ride_id === r.ride_id && (
-        <Banner kind={lastImport.diff.new_covered > 0 ? 'ok' : 'info'}>
+        lastImport.diff.new_covered === 0 && lastImport.diff.passes_added === 0 && lastImport.diff.rvi_changes.length === 0 ? (
+          <Banner kind="info"><b>Harta nu s-a schimbat:</b> {s.n_motion === 0 ? 'tura are doar traseul GPS (senzorii de mișcare nu au trimis date), deci nu putem măsura vibrațiile.' : 'tura nu are porțiuni de mers la 2,5–9 m/s cu GPS bun potrivite pe străzi (de exemplu o înregistrare staționară). Nu calculăm confort din ea.'}</Banner>
+        ) : <Banner kind={lastImport.diff.new_covered > 0 ? 'ok' : 'info'}>
           <b>Harta s-a actualizat.</b> Străzi cu date: {fmt(lastImport.diff.km_before, 2)} → {fmt(lastImport.diff.km_after, 2)} km; {lastImport.diff.new_covered} segmente noi, {lastImport.diff.new_measured} măsurate sigur, {lastImport.diff.passes_added} treceri adăugate.
           {lastImport.route.status !== 'none' && <> {lastImport.route.text}</>}
         </Banner>
@@ -88,7 +90,7 @@ export function RideDetail({ id }: { id?: string }) {
         </div>
       </details>
       {p.meta.warnings.length > 0 && <Banner kind="warn">{p.meta.warnings[0]}</Banner>}
-      <button className="btn danger block" onClick={async () => { if (confirm('Ștergi tura de pe acest telefon? Contribuția ei dispare din hartă. Nu se poate anula.')) { await removeRide(r.ride_id); go('/rides'); } }}><Trash2 /> Șterge tura</button>
+      <button className="btn danger block" onClick={async () => { if (confirm('Ștergi tura de pe acest telefon? Contribuția ei dispare din hartă. Nu se poate anula.')) { await removeRide(r.ride_id); toast('Tura a fost ștearsă; harta s-a actualizat fără ea.'); go('/rides'); } }}><Trash2 /> Șterge tura</button>
     </div></main>
   );
 }

@@ -1,6 +1,7 @@
 // Stratul „Locația mea”: punct, cerc de precizie și conul direcției (doar când direcția e credibilă).
 import L from 'leaflet';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { alive } from './useLeaflet';
 import { reliableMotion, tracker, type LocState } from '../../services/location';
 
 export function useLocation(active: boolean): LocState {
@@ -19,14 +20,14 @@ export function useMeLayer(map: L.Map | null, loc: LocState, follow: boolean) {
     return () => { layer.current?.circle.remove(); layer.current?.marker.remove(); layer.current = null; };
   }, [map]);
   useEffect(() => {
-    if (!map) return;
+    if (!alive(map)) return;
     const f = loc.fix;
     if (!f) { layer.current?.circle.remove(); layer.current?.marker.remove(); layer.current = null; return; }
     const { heading } = reliableMotion(f);
     const html = `<div class="me-wrap">${heading !== null ? `<div class="me-cone" style="transform:rotate(${Math.round(heading)}deg)"></div>` : ''}<div class="me-dot"></div></div>`;
-    const icon = L.divIcon({ className: '', html, iconSize: [20, 20], iconAnchor: [10, 10] });
+    const icon = L.divIcon({ className: '', html, iconSize: [24, 24], iconAnchor: [12, 12] });
     if (!layer.current) {
-      const circle = L.circle([f.lat, f.lon], { radius: f.acc, color: '#1857f5', weight: 1, opacity: 0.5, fillOpacity: 0.12, interactive: false }).addTo(map);
+      const circle = L.circle([f.lat, f.lon], { radius: f.acc, color: '#1857f5', weight: 1.5, opacity: 0.7, fillColor: '#1857f5', fillOpacity: 0.14, interactive: false }).addTo(map);
       const marker = L.marker([f.lat, f.lon], { icon, interactive: false, keyboard: false, zIndexOffset: 1000 }).addTo(map);
       layer.current = { circle, marker };
     } else {

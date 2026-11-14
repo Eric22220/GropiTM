@@ -7,7 +7,7 @@ import { saveReport } from '../../state/store';
 import { fmt, fmtLen, shareOrDownload } from '../format';
 import { Banner, Header, Stat, toast } from '../kit';
 import { gpsQuality, useLocation } from '../map/me';
-import { L, useLayerGroup, useLeaflet } from '../map/useLeaflet';
+import { L, alive, useLayerGroup, useLeaflet } from '../map/useLeaflet';
 import { go } from '../App';
 
 const dur = (s: number) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = Math.floor(s % 60); return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`; };
@@ -85,7 +85,7 @@ function LiveView({ onStop }: { onStop: () => void }) {
     for (const c of s.live.candidates) if (c.lat !== null && c.lon !== null) L.circleMarker([c.lat, c.lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#e8590c', fillOpacity: 1, interactive: false }).addTo(g);
   }, [s?.track.length, s?.live.candidates.length]);
   useEffect(() => {
-    if (!map || !s?.lastFix) return;
+    if (!alive(map) || !s?.lastFix) return;
     const ll: [number, number] = [s.lastFix.lat, s.lastFix.lon];
     if (!me.current) me.current = L.circleMarker(ll, { radius: 9, color: '#fff', weight: 3, fillColor: '#1857f5', fillOpacity: 1 }).addTo(map);
     else me.current.setLatLng(ll);
@@ -110,8 +110,8 @@ function LiveView({ onStop }: { onStop: () => void }) {
         {!follow && <button className="chip" onClick={() => setFollow(true)}>Recentrează</button>}
       </div>
       <div className="live-panel">
-        {s.problems.length > 0 && <div className="alert-strip" role="alert" style={{ marginBottom: 10 }}>{s.problems[0]}</div>}
-        {s.wakeLock !== 'on' && s.wakeLock !== 'unsupported' && <div className="alert-strip" style={{ marginBottom: 10 }}>Ține ecranul aprins: altfel senzorii se opresc.</div>}
+        {s.problems.length > 0 ? <div className="alert-strip" role="alert" style={{ marginBottom: 10 }}>{s.problems[0]}</div>
+          : s.wakeLock !== 'on' && s.wakeLock !== 'unsupported' ? <div className="alert-strip" style={{ marginBottom: 10 }}>Ține ecranul aprins: altfel senzorii se opresc.</div> : null}
         <div className="grid3">
           <Stat v={s.speed !== null && s.speed >= 0 ? fmt(s.speed * 3.6, 0) : '—'} unit="km/h" l="viteză" />
           <Stat v={fmtLen(s.live.distance)} l="distanță" />

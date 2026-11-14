@@ -35,8 +35,8 @@ const REPORT_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 export function drawReports(g: L.LayerGroup, reports: LocalReport[], onClick: ((r: LocalReport) => void) | null) {
   for (const r of reports) {
     const color = r.status === 'draft' ? '#6b7280' : '#c2261b';
-    const icon = L.divIcon({ className: '', html: `<div class="rep-marker" style="background:${color}">${REPORT_SVG}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
-    const m = L.marker([r.lat, r.lon], { icon, keyboard: true, title: 'Raportul tău (local)' }).addTo(g);
+    const icon = L.divIcon({ className: '', html: `<div class="rep-marker" style="background:${color}">${REPORT_SVG}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] });
+    const m = L.marker([r.lat, r.lon], { icon, keyboard: true, title: 'Raportul tău (local)', zIndexOffset: 500 }).addTo(g);
     if (onClick) m.on('click', (ev) => { L.DomEvent.stopPropagation(ev); onClick(r); });
   }
 }

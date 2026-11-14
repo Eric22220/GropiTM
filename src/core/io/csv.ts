@@ -51,6 +51,27 @@ export function parseCsv(text: string): CsvTable {
   return { header, rows };
 }
 
+/**
+ * Parcurgere în flux, fără a reține rândurile (fișierele de senzori au sute de mii de linii):
+ * întoarce antetul și apelează cb pentru fiecare rând nevid.
+ */
+export function forEachRow(text: string, onHeader: (h: string[]) => void, cb: (row: string[]) => void): void {
+  let pos = text.charCodeAt(0) === 0xfeff ? 1 : 0;
+  let header = true;
+  const n = text.length;
+  while (pos < n) {
+    let end = text.indexOf('\n', pos);
+    if (end < 0) end = n;
+    let line = text.slice(pos, end);
+    if (line.endsWith('\r')) line = line.slice(0, -1);
+    pos = end + 1;
+    if (line.trim() === '') continue;
+    const cells = splitLine(line);
+    if (header) { onHeader(cells.map((s) => s.trim())); header = false; }
+    else cb(cells);
+  }
+}
+
 export function colIndex(t: CsvTable, ...names: string[]): number {
   for (const n of names) {
     const i = t.header.findIndex((h) => h.toLowerCase() === n.toLowerCase());

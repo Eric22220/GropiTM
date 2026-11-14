@@ -3,7 +3,7 @@ import { G } from '../config';
 import { median } from '../stats';
 import { nsStringToMs } from '../time';
 import type { GpsFix, GyroData, MotionData, RawRide, RideEvent, RideMeta } from '../types';
-import { colIndex, decodeText, num, parseCsv, type CsvTable } from './csv';
+import { colIndex, decodeText, forEachRow, num, parseCsv, type CsvTable } from './csv';
 import { findFile, type FileMap } from './zip';
 
 export class ImportError extends Error {}
@@ -27,26 +27,38 @@ interface Xyz {
   z: Float32Array;
 }
 
-function readXyz(t: CsvTable): Xyz {
-  const it = colIndex(t, 'time');
-  const ix = colIndex(t, 'x'), iy = colIndex(t, 'y'), iz = colIndex(t, 'z');
-  if (it < 0 || ix < 0 || iy < 0 || iz < 0) throw new ImportError('Coloane lipsă (time, x, y, z).');
-  const n = t.rows.length;
-  const T = new Float64Array(n), X = new Float32Array(n), Y = new Float32Array(n), Z = new Float32Array(n);
-  let k = 0;
-  let last = -Infinity;
-  for (let i = 0; i < n; i++) {
-    const r = t.rows[i];
-    const tm = nsStringToMs(r[it]);
-    const x = num(r, ix), y = num(r, iy), z = num(r, iz);
-    if (!Number.isFinite(tm) || tm <= last) continue; // timp invalid sau nemonoton
-    T[k] = tm;
-    X[k] = x;
-    Y[k] = y;
-    Z[k] = z;
-    last = tm;
-    k++;
-  }
+/** citire în flux a unui fișier time,x,y,z direct în typed arrays (fără a reține rândurile) */
+function readXyzFile(files: FileMap, name: string): Xyz | null {
+  const f = findFile(files, name);
+  if (!f || f.length === 0) return null;
+  const text = decodeText(f);
+  // estimare de capacitate: ~50 octeți pe linie; se mărește la nevoie
+  let cap = Math.max(1024, Math.ceil(f.length / 40));
+  let T = new Float64Array(cap), X = new Float32Array(cap), Y = new Float32Array(cap), Z = new Float32Array(cap);
+  let it = -1, ix = -1, iy = -1, iz = -1;
+  let k = 0, last = -Infinity;
+  forEachRow(
+    text,
+    (h) => {
+      const idx = (n: string) => h.findIndex((c) => c.toLowerCase() === n);
+      it = idx('time'); ix = idx('x'); iy = idx('y'); iz = idx('z');
+      if (it < 0 || ix < 0 || iy < 0 || iz < 0) throw new ImportError(`${name}: coloane lipsă (time, x, y, z).`);
+    },
+    (r) => {
+      const tm = nsStringToMs(r[it]);
+      if (!Number.isFinite(tm) || tm <= last) return; // timp invalid sau nemonoton
+      if (k >= cap) {
+        cap *= 2;
+        const g64 = (a: Float64Array) => { const b = new Float64Array(cap); b.set(a); return b; };
+        const g32 = (a: Float32Array) => { const b = new Float32Array(cap); b.set(a); return b; };
+        T = g64(T); X = g32(X); Y = g32(Y); Z = g32(Z);
+      }
+      T[k] = tm; X[k] = num(r, ix); Y[k] = num(r, iy); Z[k] = num(r, iz);
+      last = tm;
+      k++;
+    },
+  );
+  if (k === 0) return null;
   return { t: T.slice(0, k), x: X.slice(0, k), y: Y.slice(0, k), z: Z.slice(0, k) };
 }
 
@@ -97,20 +109,19 @@ export function parseSensorLogger(files: FileMap): RawRide {
   let accelFile = '';
   let acc: Xyz | null = null;
   for (const name of ['TotalAcceleration.csv', 'AccelerometerUncalibrated.csv']) {
-    const t = table(files, name);
-    if (t) {
-      acc = readXyz(t);
+    const d = readXyzFile(files, name);
+    if (d) {
+      acc = d;
       accelFile = name;
       break;
     }
   }
   if (!acc) {
     // Rezervă: Accelerometer (fără gravitație) + Gravity, ambele virtuale. Marcat explicit.
-    const a = table(files, 'Accelerometer.csv');
-    const g = table(files, 'Gravity.csv');
-    if (a && g) {
-      const ax = readXyz(a);
-      const gx = nearestAlign(ax, readXyz(g));
+    const ax = readXyzFile(files, 'Accelerometer.csv');
+    const gr = readXyzFile(files, 'Gravity.csv');
+    if (ax && gr) {
+      const gx = nearestAlign(ax, gr);
       acc = { t: ax.t, x: ax.x.map((v, i) => v + gx.x[i]), y: ax.y.map((v, i) => v + gx.y[i]), z: ax.z.map((v, i) => v + gx.z[i]) };
       accelFile = 'Accelerometer.csv+Gravity.csv';
       warnings.push('Lipsește accelerația brută (TotalAcceleration / AccelerometerUncalibrated); s-a reconstruit din Accelerometer + Gravity (senzori virtuali). Activează „Uncalibrated" în Sensor Logger.');
@@ -134,9 +145,8 @@ export function parseSensorLogger(files: FileMap): RawRide {
   let gyro: GyroData | null = null;
   let gyroFile = '';
   for (const name of ['Gyroscope.csv', 'GyroscopeUncalibrated.csv']) {
-    const t = table(files, name);
-    if (t) {
-      const g = readXyz(t);
+    const g = readXyzFile(files, name);
+    if (g) {
       const mag = new Float32Array(g.t.length);
       for (let i = 0; i < mag.length; i++) mag[i] = (Math.hypot(g.x[i], g.y[i], g.z[i]) * 180) / Math.PI;
       gyro = { t: g.t, mag };

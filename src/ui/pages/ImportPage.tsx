@@ -47,7 +47,7 @@ export function ImportPage() {
       <input
         ref={input}
         type="file"
-        accept=".zip,application/zip,application/x-zip-compressed,.csv,text/csv"
+        accept=".zip,application/zip,application/x-zip-compressed,application/octet-stream,.csv,text/csv"
         className="sr-only"
         id="ridefile"
         onChange={(e) => onFile(e.target.files?.[0])}

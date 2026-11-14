@@ -6,7 +6,20 @@ ShockGrid măsoară cât de denivelate sunt străzile și pistele din Timișoara
 
 Indicele se numește **RVI (Relative Vibration Index)**: RMS-ul accelerației verticale filtrate trece-sus (> 4 Hz) pe ferestre de 2 s. E relativ: valabil pentru combinația telefon + bicicletă + suport + viteză în care a fost măsurat.
 
-Fluxul demo: **Sensor Logger → import ZIP → procesare RVI → segmente OSM colorate → comparația a două rute reale → recomandare condiționată de acoperirea datelor.** Procesarea se face după import (*post-import processing*), nu e telemetrie live.
+## Ce poți face (versiunea 2)
+
+| Zona | Ce face |
+|---|---|
+| **Hartă** | Segmentele măsurate colorate A–E, linie întreruptă = puține date, fără culoare = nemăsurat. Buton **Locația mea** (cerc de precizie, mod urmărire), **Raportează**, legendă în panou. |
+| **Traseu** | „De unde pleci?” (implicit Locația mea, dacă ai permis) → „Unde mergi?” cu căutare de adrese și locuri, alegere pe hartă, inversare, destinații recente (locale). Cea mai scurtă / Echilibrată / Confort maxim, cu % măsurat, % necunoscut și problemele cunoscute de pe rută. Fără date → „Nu avem încă suficiente măsurători pentru o recomandare de confort”. **Pornește** arată poziția pe rută și distanța rămasă. |
+| **Ture** | **Pornește o tură** (înregistrare în browser, ecranul aprins: viteză, distanță, durată, calitatea GPS, posibile denivelări), **Importă** ZIP-ul Sensor Logger, istoric, comparație, export. După tură: „Am observat N posibile denivelări. Vrei să le verifici?” cu Da / Nu / Nu știu și tipul problemei. |
+| **Mai mult** | Rapoartele mele (doar pe telefon), metodologie, date și surse, exporturi GeoJSON, confidențialitate, instrumente avansate (diagnostic senzori, parametri, validare). |
+
+**Ce e public și ce e local:** stratul agregat publicat de echipă (`public/data/comfort-layer.json`) e public. Turele, rapoartele, fotografiile și destinațiile recente rămân **doar pe telefon**; nu există o bază comună de rapoarte (vezi [docs/BACKEND-COMUNITAR.md](docs/BACKEND-COMUNITAR.md)).
+
+**Căutarea de adrese:** străzile se caută local, din graful OpenStreetMap (merge offline); adresele și punctele de interes prin serviciul public [Photon](https://photon.komoot.io) (komoot), făcut pentru autocomplete. Nu folosim Nominatim public pentru autocomplete (politica lui o interzice). Cereri doar de la 3 caractere, cu debounce, anularea cererilor depășite, cache și timeout; dacă Photon nu răspunde, rămân străzile locale și alegerea pe hartă.
+
+Fluxul demo: **Sensor Logger → import ZIP → procesare RVI → segmente OSM colorate → comparația a două rute reale → recomandare condiționată de acoperirea datelor.** Importul e procesare după import (*post-import processing*); tura live din browser e analizată pe telefon în timpul mersului, cu ecranul aprins.
 
 ## Pe telefon, pas cu pas
 
@@ -23,9 +36,14 @@ Fluxul demo: **Sensor Logger → import ZIP → procesare RVI → segmente OSM c
 
 ### Importul unei ture direct pe telefon (fluxul principal)
 1. În **Sensor Logger**: deschide înregistrarea → **Export** → format **ZIP (CSV)** → salvează în **Fișiere** (iPhone) sau **Descărcări** (Android).
-2. În ShockGrid: **Importă tura (Sensor Logger)** → se deschide selectorul de fișiere → alege ZIP-ul.
-3. Aplicația afișează progresul procesării, apoi rezumatul, traseul pe hartă și **ce s-a schimbat pe hartă** (km acoperiți, muchii noi, treceri, dacă s-a schimbat ruta recomandată).
-4. **Hartă** arată segmentele colorate pe clase A–E; **Rută** recomandă între A și B; **Compară** pune două ture una lângă alta.
+2. În ShockGrid: **Ture → Importă** → alege ZIP-ul.
+3. Dacă algoritmul a găsit șocuri puternice, apare verificarea „Am observat N posibile denivelări”; apoi pagina turei cu **ce s-a schimbat pe hartă** (km cu date, segmente noi, treceri, dacă s-a schimbat ruta recomandată).
+
+### Tură live în ShockGrid
+**Ture → Pornește o tură** → verificarea GPS-ului și a senzorilor → **Pornește tura** (pe iPhone se cere permisiunea pentru senzori). Telefonul fixat pe ghidon, **ecranul aprins** (aplicația cere Wake Lock). **Marchează** salvează locul pentru un raport completat mai târziu. **Stop → Termină tura** procesează tura exact ca un import.
+
+### Raportarea unei probleme
+Pe hartă: **Raportează** → ajustezi locul mutând harta → tipul (groapă, denivelare, capac, rost/șine, asfalt deteriorat, obstacol, altceva) → fotografie și descriere opționale → **Salvează**. În mers: **Marchează pentru mai târziu** (doar poziția și ora). Raportul rămâne pe telefon; din pagina lui poți copia textul pentru [Sesizări](https://sesizari.primariatm.ro/).
 
 Turele rămân **doar pe telefon** (IndexedDB). Datele de pe iPhone nu apar pe Samsung și invers; datele salvate pe alt URL (de ex. un tunel de test) nu apar pe GitHub Pages.
 

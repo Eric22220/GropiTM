@@ -27,6 +27,15 @@
 - Aplicația nu interpretează legislația; trotuarele fără drept explicit pentru biciclete sunt excluse implicit, după etichetele OSM.
 - Fără navigație pas cu pas.
 
+## Despre tura live, locație și căutare (versiunea 2)
+- **Ecranul trebuie să rămână aprins.** O aplicație web nu poate citi accelerometrul cu ecranul blocat sau aplicația în fundal; ShockGrid cere Wake Lock unde există și arată un banner dacă se pierd date. Pentru ture cu ecranul blocat rămâne Sensor Logger (importul se face după export; nu există integrare live cu Sensor Logger).
+- **Cifrele live sunt informative.** În timpul turei rulăm aceleași funcții din nucleu pe ultimele ~30 s; rezultatul final vine din procesarea completă după oprire.
+- **Posibilele denivelări nu sunt gropi.** Sunt șocuri puternice ale accelerometrului (giroscopul doar exclude mișcările mâinii). Tipul problemei îl spune utilizatorul, după tură. Confirmările nu schimbă costul rutelor (șocurile sunt deja parțial în RVI).
+- **Locația:** precizia GPS (cercul albastru) nu garantează poziția exactă; viteza și direcția se afișează doar când sunt credibile. „Pornește” arată poziția pe rută și distanța rămasă, fără navigație pas cu pas sau indicații vocale.
+- **Căutarea de adrese** prin Photon (komoot) e un serviciu public gratuit, fără garanție de disponibilitate; textul căutat ajunge la el. Fără rețea rămân străzile din indexul local și alegerea pe hartă. Adresele cu număr depind de completitudinea OpenStreetMap.
+- **Rapoartele sunt doar locale.** Nu există o bază comună; nimeni altcineva nu le vede (vezi `docs/BACKEND-COMUNITAR.md`).
+- **Nu a fost testat pe iPhone/Samsung fizic** (senzori, Wake Lock, permisiuni, fotografie): toate verificările de interfață sunt în Chromium, la dimensiunile ecranelor, cu senzori simulați în teste.
+
 ## Despre colectare
 - Un site web **nu poate citi senzorii cu ecranul stins**. Înregistratorul propriu (P1) cere ecranul aprins (Screen Wake Lock); pentru turele de teren folosim **Sensor Logger**.
 - Chrome pe Android rotunjește accelerația din browser la 0,1 m/s²; Sensor Logger nu.

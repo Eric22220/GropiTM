@@ -15,6 +15,24 @@ Fișier de reluare: ce merge, ce a fost verificat și cum, ce nu merge. Cel mai 
 - **Zona cu șoc — „treceri”:** numărul de treceri al zonei = trecerile muchiei pe care stă (din agregarea RVI), minim numărul de detectări. Nu publicăm trasee, deci nu putem număra trecerile prin rază din snapshot.
 - **Ghidul Primăriei:** nu contrazice specificația. Notat: „treat gaps as unknown”, „Romanian first”, WCAG 2.1 AA, „private by default”, Sesizări ca unic canal pentru probleme (nu trimitem sesizări, doar link), `/api/zones` e BROWSER OK (opțional, neimplementat încă).
 
+## Phase 2 — produs mobil (14.11.2026, seara)
+Checkpoint înainte de redesign: tag `checkpoint-pre-redesign` (commit 64697a0), 40/40 teste.
+
+**Implementat (P0–P2):**
+- Design system nou (`src/ui/styles.css`): Inter auto-găzduit (OFL), tokeni, albastru electric / turcoaz / portocaliu / roșu, mod întunecat cu tile-uri OSM atenuate, bottom sheets, ținte ≥ 44 px; iconițe lucide (ISC). Contrastul AA e **testat** (`test/contrast.test.ts`, 28 perechi în ambele teme; a corectat turcoazul și albastrul din modul întunecat).
+- Navigare în 4 zone (Hartă, Traseu, Ture, Mai mult); detaliile tehnice (RVI brut, parametri, OSM, validare, diagnostic) mutate în „Instrumente avansate”. ErrorBoundary pe ecrane.
+- Traseu prin adrese: `src/services/geocode.ts` — index local de străzi din graful OSM (offline) + Photon (komoot) cu debounce 350 ms, anulare, cache, timeout 6 s, filtrare pe zona Timișoarei; recente locale; alegere pe hartă; inversare; conectare la graf prin `snapNode`; sensuri unice/trotuare ca înainte. **Justificare:** Photon e făcut pentru autocomplete (Nominatim interzice); indexul local acoperă străzile fără rețea.
+- Alternative de rută: `src/core/routeplan.ts` — scurtă/echilibrată/confort, fără duplicate, ascunde rutele „de confort” majoritar necunoscute, verdict onest (`nodata` / `insufficient` / `same` / `better`), probleme cunoscute pe rută (zone cu șoc + rapoarte locale). „Pornește” = urmărirea poziției pe rută și distanța rămasă.
+- Locația mea: `src/services/location.ts` — un singur `watchPosition` partajat, oprit la ultima eliberare; cerc de precizie, mod urmărire (se oprește la tragerea hărții), direcție/viteză doar când sunt credibile; mesaje pentru refuz/expirare/fără semnal/HTTP.
+- Tură live: `src/capture/live.ts` rulează **aceleași** funcții din nucleu pe o fereastră glisantă de ~30 s la fiecare 5 s; `Recorder` cu dependențe injectabile, sesiune globală (`src/services/ride.ts`) care continuă la schimbarea ecranului; afișează doar viteză, distanță, durată, GPS, stare, denivelări candidate; detectarea opririi; „Marchează” pentru un raport ulterior; la oprire procesare completă ca la import.
+- Verificarea după tură (`ReviewScreen`): „Am observat N posibile denivelări…”, mini-hartă, ora, strada aproximativă, intensitate; Da (+ tip) → raport local legat de șoc; Nu → detectarea respinsă; Nu știu → rămâne neverificată. Confirmările nu intră în costul rutei.
+- Rapoarte manuale: IndexedDB v2 (migrare testată de la v1), marcaj rapid, tip, fotografie micșorată și re-encodată (fără EXIF/GPS), descriere, editare, ștergere, export GeoJSON, text și link pentru Sesizări. Eticheta „Salvat doar pe acest telefon” peste tot; nicio afirmație de publicare.
+- Descrierea repo-ului actualizată (fără „GropiTM” și fără promisiuni de real-time); topics adăugate. Analiză backend comunitar: `docs/BACKEND-COMUNITAR.md` (neimplementat, intenționat).
+
+**Verificat:** 102/102 teste (11 fișiere; 62 noi: geocoding cu Photon simulat — rezultate, cache, HTTP/offline/timeout/anulare; locație — refuz, expirare, oprirea watcher-ului; rute 100% necunoscute; tură start/pauză/oprire cu IMU simulat la 100 Hz; analiza live = procesarea completă; șoc candidat; confirmare/respingere; rapoarte CRUD + ștergerea tuturor datelor; local vs public; migrarea IndexedDB; compatibilitatea GitHub Pages pe `dist/`). În Chromium (dev server) la 390×844 și 412×915, temă luminoasă și întunecată: căutare reală Photon („iulius” → Iulius Town/Mall, Lipovei), stradă locală „victoriei”, rută Piața Victoriei → Iulius Town 1,72 km cu mesajul „Nu avem încă suficiente măsurători…”; raport creat/listat/editat cu text Sesizări; tură sintetică (generată în consolă, apoi ștearsă) → verificare 2 denivelări → Da/Groapă + Nu; GPS refuzat de browserul de test → mesaj corect. Audit ținte < 44 px: doar un link inline (excepție WCAG).
+**Nu a fost testat pe telefoane fizice:** senzori, Wake Lock, permisiunea iOS, camera, instalarea PWA.
+**Bug-uri găsite și reparate:** harta ecranului Traseu nu se inițializa când ecranul se deschidea direct în căutare; contrast insuficient la butonul turcoaz (4,0:1) și la tab-ul activ în modul întunecat (4,3:1).
+
 ## Stare (14.11.2026)
 
 ### Faza 0 — import Sensor Logger, schelet, deploy: GATA

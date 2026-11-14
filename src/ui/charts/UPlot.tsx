@@ -24,13 +24,15 @@ export function UPlot({ data, series, height = 200, xLabel, yLabel, xTime = fals
     const el = ref.current;
     if (!el) return;
     const width = Math.max(260, el.clientWidth);
+    // canvas-ul nu înțelege variabilele CSS: citim culoarea efectivă
+    const fg = getComputedStyle(el).color || '#14212b';
     const opts: uPlot.Options = {
       width,
       height,
       scales: { x: { time: xTime }, ...(scalesY ? { y: scalesY } : {}) },
       axes: [
-        { label: xLabel, stroke: 'var(--fg)', grid: { stroke: 'rgba(128,128,128,.15)' } },
-        { label: yLabel, stroke: 'var(--fg)', grid: { stroke: 'rgba(128,128,128,.15)' } },
+        { label: xLabel, stroke: fg, grid: { stroke: 'rgba(128,128,128,.2)' }, ticks: { stroke: 'rgba(128,128,128,.3)' } },
+        { label: yLabel, stroke: fg, grid: { stroke: 'rgba(128,128,128,.2)' }, ticks: { stroke: 'rgba(128,128,128,.3)' } },
       ],
       series: [{}, ...series],
       cursor: { drag: { x: true, y: false } },

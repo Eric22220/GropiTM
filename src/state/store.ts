@@ -131,16 +131,17 @@ export async function init() {
   recompute(rides);
   set({ ready: true });
 
+  const okJson = (r: Response) => (r.ok && (r.headers.get('content-type') ?? '').includes('json') ? r.json() : null);
   const snapP = fetch(`${BASE}data/comfort-layer.json`, { cache: 'no-cache' })
-    .then((r) => (r.ok ? r.json() : null))
+    .then(okJson)
     .then((snap: Snapshot | null) => {
       set({ snapshot: snap && Array.isArray(snap.edges) ? snap : null, snapshotStatus: snap ? 'ready' : 'missing' });
     })
     .catch(() => set({ snapshotStatus: 'missing' }));
-  fetch(`${BASE}data/eval-latest.json`, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).then((e) => set({ evalResults: e })).catch(() => {});
+  fetch(`${BASE}data/eval-latest.json`, { cache: 'no-cache' }).then(okJson).then((e) => set({ evalResults: e })).catch(() => {});
   const graphP = fetch(`${BASE}data/graph-timisoara.json`)
     .then(async (r) => {
-      if (!r.ok) { set({ graphStatus: 'missing' }); return; }
+      if (!r.ok || !(r.headers.get('content-type') ?? '').includes('json')) { set({ graphStatus: 'missing' }); return; }
       const j = (await r.json()) as GraphJson;
       set({ graph: new Graph(j), graphStatus: 'ready' });
       router = null;

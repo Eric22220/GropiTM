@@ -1,0 +1,38 @@
+# Limitări (ce NU știm și ce NU promitem)
+
+## Despre măsurătoare
+- **RVI e relativ.** E valabil pentru combinația telefon + bicicletă + suport + presiune în roți + viteză din calibrare. Valorile nu sunt comparabile între telefoane, biciclete sau suporturi diferite fără calibrare.
+- **Viteza contează.** Vibrația crește cu viteza; indicele se compară doar între ferestre din banda 2,5–9 m/s, iar viteza mediană apare lângă fiecare valoare. Normalizarea după viteză (lege de putere) nu e implementată.
+- **Doza de vibrații** e inspirată din ISO 2631-1, dar **neponderată** în frecvență: nu e „conform ISO”.
+- **Parametrii marcați [EXPERIMENTAL]** (filtru trece-sus 4 Hz, τ = 1 s, ferestre 2 s, praguri de viteză, giroscop 300 °/s, mount_shift 15°, praguri de șoc, P_confort) sunt puncte de plecare care trebuie verificate pe turele reale; nu sunt constante dovedite.
+- **Clasele A–E** sunt percentilele 20/40/60/80 ale ferestrelor valide ale echipei (sau valori implicite până există ≥ 30 de ferestre). Se verifică pe segmentele de referință (neted vs pavaj).
+- **Exporturile de test din `sample-data/`** sunt staționare (iPhone, 238 s) și un test scurt pe jos (Samsung, 49 s): **nu sunt măsurători de drum** și nu produc segmente măsurate.
+
+## Despre hartă și GPS
+- **Un segment nemăsurat nu e neted.** Starea `UNKNOWN` nu primește RVI, clasă sau culoare.
+- Cu GPS de ~4–6 m, **trotuarul și carosabilul paralel nu se pot separa** sigur: potrivirea ambiguă face segmentul cel mult `LOW_CONFIDENCE`, cu motivul afișat. Suprafața declarată la import rezolvă ambiguitatea.
+- Unde OSM nu desenează trotuarul separat (doar eticheta `sidewalk=*` pe stradă), trotuarul și carosabilul sunt o singură linie și nu pot fi separate.
+- Completitudinea pistelor din OpenStreetMap în Timișoara nu e verificată: o lipsă înseamnă „necunoscut”, nu „fără pistă”.
+- Harta are nevoie de internet pentru tile-urile OSM (cele văzute rămân în cache); procesarea, importul și rutarea merg și fără.
+
+## Despre șocuri
+- Sunt „șoc posibil”, nu „groapă”: **nu identificăm tipul obstacolului**.
+- Cu GPS de ~5 m nu putem separa două obstacole aflate la câțiva metri; punctul se numește „zonă cu șoc”, cu raza vizibilă.
+- `double_hit` (roata față + spate la ampatamentul ~1,05 m) e o ipoteză de verificat pe date, nu o dovadă.
+- Șocurile nu intră în costul rutării (sunt deja parțial în RVI).
+
+## Despre rutare
+- Nu promitem rute „mai sigure”: nu avem date de accidente. Recomandăm doar rute cu vibrații măsurate mai mici.
+- Dacă peste 50% din lungimea rutei e necunoscută, aplicația spune „Prea puține date pentru o recomandare de confort”.
+- Aplicația nu interpretează legislația; trotuarele fără drept explicit pentru biciclete sunt excluse implicit, după etichetele OSM.
+- Fără navigație pas cu pas.
+
+## Despre colectare
+- Un site web **nu poate citi senzorii cu ecranul stins**. Înregistratorul propriu (P1) cere ecranul aprins (Screen Wake Lock); pentru turele de teren folosim **Sensor Logger**.
+- Chrome pe Android rotunjește accelerația din browser la 0,1 m/s²; Sensor Logger nu.
+- Înregistrarea cu ecranul blocat în Sensor Logger nu e considerată verificată până la testul din `docs/TEREN.md` (9.2d).
+
+## Tehnice
+- Graful străzilor se construiește din Overpass în GitHub Actions (mediul de dezvoltare local nu are acces la Overpass).
+- Datele din IndexedDB sunt legate de origine: turele importate pe GitHub Pages nu apar pe alt URL (tunel, localhost) și invers; ștergerea datelor site-ului din browser le șterge.
+- Pe iPhone, Safari poate șterge datele site-urilor neinstalate nefolosite 7 zile; instalează aplicația pe ecranul principal și exportă turele importante.

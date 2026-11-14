@@ -16,7 +16,7 @@ export function MapPage({ focus }: { focus?: string }) {
   const settings = useApp((s) => s.settings);
   const [sel, setSel] = useState<{ edge?: EdgeAgg; zone?: ShockZone } | null>(null);
   const [showTracks, setShowTracks] = useState(graphStatus !== 'ready' || !!focus);
-  const [legendOpen, setLegendOpen] = useState(true);
+  const [legendOpen, setLegendOpen] = useState(() => window.innerWidth > 700);
   const { ref, map } = useLeaflet({ onClick: () => setSel(null) });
 
   useLayerGroup(map, (g) => {

@@ -11,7 +11,8 @@ export function useLeaflet(opts: { zoom?: number; onClick?: (lat: number, lon: n
   clickRef.current = opts.onClick;
   useEffect(() => {
     if (!ref.current) return;
-    const m = L.map(ref.current, { preferCanvas: true, zoomControl: true, tapTolerance: 20 }).setView(TIMISOARA_CENTER, opts.zoom ?? 13);
+    const m = L.map(ref.current, { preferCanvas: true, zoomControl: false, tapTolerance: 20 }).setView(TIMISOARA_CENTER, opts.zoom ?? 13);
+    L.control.zoom({ position: 'topright' }).addTo(m);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',

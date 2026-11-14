@@ -110,7 +110,7 @@ input[type=range] { width: 100%; min-height: 32px; }
   position: absolute; z-index: 800; left: 8px; right: 8px; background: var(--bg); color: var(--fg);
   border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; box-shadow: 0 2px 10px rgba(0,0,0,.2);
 }
-.overlay.top { top: 8px; }
+.overlay.top { top: 8px; right: 58px; max-height: 70%; overflow-y: auto; }
 .overlay.bottom { bottom: 8px; max-height: 58%; overflow-y: auto; }
 .overlay .closebtn { position: absolute; right: 6px; top: 6px; min-height: 40px; min-width: 40px; padding: 4px; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 13px; align-items: center; }

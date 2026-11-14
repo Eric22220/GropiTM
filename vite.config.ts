@@ -38,6 +38,10 @@ export default defineConfig(({ command }) => ({
         ],
       },
       workbox: {
+        // versiunea nouă se activează singură, și pentru instalările existente (reîncărcarea paginii e amânată în aplicație)
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         globIgnores: ['**/data/**'],
         navigateFallbackDenylist: [/\/data\//],

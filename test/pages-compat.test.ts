@@ -35,4 +35,10 @@ describe('GitHub Pages', () => {
     expect(man.scope).toBe('/ShockGrid/');
     expect(man.start_url).toBe('/ShockGrid/');
   });
+  it.skipIf(!existsSync('dist/sw.js'))('service worker-ul nou se activează singur (utilizatorii existenți primesc actualizarea)', () => {
+    const sw = readFileSync('dist/sw.js', 'utf8');
+    expect(sw).toMatch(/self\.skipWaiting\(\)/);
+    expect(sw.replace(/SKIP_WAITING"===e\.data\.type&&self\.skipWaiting\(\)/g, '')).toMatch(/self\.skipWaiting\(\)/);
+    expect(sw).toMatch(/clientsClaim\(\)/);
+  });
 });

@@ -25,6 +25,9 @@ export function initUpdates(isBusy: () => boolean) {
   if (import.meta.env.DEV || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
   const base = import.meta.env.BASE_URL;
   wb = new Workbox(`${base}sw.js`, { scope: base });
+  // un service worker care așteaptă (de ex. de la o versiune mai veche a build-ului) e activat imediat;
+  // doar reîncărcarea paginii e amânată când nu e sigură
+  wb.addEventListener('waiting', () => { wb?.messageSkipWaiting(); });
   wb.addEventListener('controlling', (e) => {
     if (!e.isUpdate) return;
     pending = true;

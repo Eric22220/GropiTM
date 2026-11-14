@@ -1,0 +1,40 @@
+name: Build street graph (OSM)
+
+# Descarcă o singură dată rețeaua stradală a Timișoarei din Overpass, comite răspunsul brut
+# (data/raw/) și graful (public/data/), apoi pornește deploy-ul. Rulare manuală.
+on:
+  workflow_dispatch:
+    inputs:
+      refresh:
+        description: 'Descarcă din nou din Overpass (altfel folosește data/raw comis)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  graph:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build graph
+        run: |
+          if [ "${{ inputs.refresh }}" = "true" ]; then npm run build-graph -- --refresh; else npm run build-graph; fi
+      - name: Commit graph
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/raw public/data/graph-timisoara.json
+          git diff --cached --quiet || git commit -m "data: graful străzilor din OpenStreetMap (ODbL)"
+          git push
+      - name: Trigger deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref main

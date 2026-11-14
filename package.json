@@ -1,0 +1,39 @@
+{
+  "name": "shockgrid",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "ShockGrid (GropiTM) — harta confortului velo din Timișoara, din vibrații măsurate cu telefonul pe ghidon.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "inspect": "tsx scripts/inspect.ts",
+    "build-graph": "tsx scripts/build-graph.ts",
+    "build-layer": "tsx scripts/build-layer.ts",
+    "validate": "tsx scripts/validate.ts"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2",
+    "idb": "^8.0.0",
+    "leaflet": "^1.9.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "uplot": "^1.6.30"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.12",
+    "@types/node": "^22.7.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.2",
+    "tsx": "^4.19.1",
+    "typescript": "~5.6.2",
+    "vite": "^5.4.8",
+    "vite-plugin-pwa": "^0.20.5",
+    "vitest": "^2.1.2"
+  }
+}

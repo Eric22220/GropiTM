@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dev-dist/
+*.log
+.env
+.env.*
+.vite/
+
+# Date brute private: NU se publică (coordonate GPS, deplasarea utilizatorului)
+rides/
+sample-data/
+eval/private/
+
+# Ghidul primit la UniHack (nu e al nostru, nu îl republicăm)
+*.pdf

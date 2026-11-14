@@ -44,6 +44,16 @@ Fișier de reluare: ce merge, ce a fost verificat și cum, ce nu merge. Cel mai 
 ### Teste (Vitest)
 36 trecute, 2 sărite până la graful real (schema + A* vs Dijkstra pe 100 de perechi). Acoperă: CSV/BOM/null, ns epoch, unitate, Sensor Logger sintetic + ambele exporturi reale, ZIP64, format vechi, refuz .xlsx, export ShockGrid, biquad la 100/58,5/40 Hz, invarianța la rotire, RMS, excluderi (viteză, gol, giroscop, fs), VDV, distanță (staționar < 5 m; 5 m/s ±10% ambele metode), șocuri + double_hit, A* (drum minim, sens unic, trotuare), regula 50%, 8.6 (schimbarea rutei după import și revenirea după ștergere, dublura, ordinea, versiunea/cache-ul), monotonia Σ length·P, map-matching (ambiguitate, suprafață declarată, precizie > 20 m).
 
+### Verificări cap-coadă (14.11, după graful real)
+- Graful comis (commit 9802683 de la GitHub Actions): `graph-timisoara.json` 4,3 MB, servit de Pages comprimat **1,05 MB**; `data/raw/overpass-timisoara.json.gz` 1,2 MB.
+- Teste: **40/40** (inclusiv schema grafului real, A* = Dijkstra pe 100 de perechi aleatoare, tură sintetică pe străzi reale: 100% ferestre potrivite, 86% pe muchiile rutei).
+- Browser (dev server, viewport mobil 375–420 px, Chromium): 3 ture SINTETICE (generate în consolă, șterse apoi) pe ruta Piața Victoriei → nord, cu vibrații diferite pe porțiuni + un impuls: import 116–196 ms fiecare; după a 2-a trecere 27 muchii MEASURED noi, după a 3-a 42 MEASURED; zona cu șoc REPEATED 3/3; „ruta recomandată s-a schimbat” / „a rămas aceeași: segmentele atinse sunt pe rută…”; panoul segmentului cu toate câmpurile 8.3; rutarea curier ocolește segmentul E pe străzi nemăsurate → regula de 50% afișează „Prea puține date…” (corect); Compară pe trecerile identice → „Diferență neconcludentă”.
+- Exporturile reale `sample-data`: fixurile sunt la ~43 m de cea mai apropiată muchie (înregistrate în interior) → 0 potriviri, corect (raza 15–20 m).
+- Producție (`https://eric22220.github.io/ShockGrid/`, Chromium): pagina se încarcă, graful devine „ready”, fără erori JS (doar 404 pentru fișierele de date încă nepublicate, acum înlocuite cu un snapshot gol valid).
+- Performanță: tură sintetică de 30 min la 100 Hz (ZIP 2,6 MB) — parsare 0,3 s + procesare 0,3 s pe laptop, heap +12 MB (după trecerea la parsarea în flux a fișierelor mari).
+- Licențe producție (citite din node_modules): fflate MIT, idb ISC, leaflet BSD-2-Clause, react/react-dom/scheduler/loose-envify/js-tokens MIT, uplot MIT. (`npx license-checker` n-a putut fi rulat în mediul local.)
+- `build-layer` și `validate` rulate pe exporturile de test: funcționează, 0 muchii (staționar); ieșirile au fost șterse, nu se publică.
+
 ### Ce lipsește / următorii pași
 - Turele de teren (Faza 1) și calibrarea pe ele: `npm run inspect`, `build-layer`, `validate` pe `rides/`. Snapshotul publicat e gol până atunci (harta arată doar turele importate pe telefon).
 - Test pe telefoanele reale (iPhone Safari, Samsung Chrome): import, instalare PWA, înregistrator.

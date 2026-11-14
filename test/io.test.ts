@@ -65,6 +65,19 @@ describe('Sensor Logger sintetic: fișiere goale, -1 → null, coloane în altă
   });
 });
 
+describe.skipIf(!hasFile(SAMPLE_IOS))('ZIP64 din Sensor Logger', () => {
+  it('dimensiunile vin din câmpul extra ZIP64, nu din 0xFFFFFFFF', async () => {
+    const { listZip } = await import('../src/core/io/zip');
+    const entries = listZip(readBytes(SAMPLE_IOS));
+    const meta = entries.find((e) => e.name.endsWith('Metadata.csv'))!;
+    expect(meta.usize).toBe(400);
+    expect(entries.every((e) => e.usize < 1e8 && e.csize < 1e8)).toBe(true);
+    const files = unzipFlat(readBytes(SAMPLE_IOS));
+    expect(files['Metadata.csv'].length).toBe(400);
+    expect(files['Accelerometer.csv'].length).toBe(0);
+  });
+});
+
 describe.skipIf(!hasFile(SAMPLE_IOS))('export real Sensor Logger iPhone 14', () => {
   it('100 Hz, 0 goluri, 237 fixuri, unitate g, gravitație ~9,81', () => {
     const raw = parseRideFile('iphone.zip', readBytes(SAMPLE_IOS));

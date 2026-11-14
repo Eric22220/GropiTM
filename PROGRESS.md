@@ -15,6 +15,35 @@ Fișier de reluare: ce merge, ce a fost verificat și cum, ce nu merge. Cel mai 
 - **Zona cu șoc — „treceri”:** numărul de treceri al zonei = trecerile muchiei pe care stă (din agregarea RVI), minim numărul de detectări. Nu publicăm trasee, deci nu putem număra trecerile prin rază din snapshot.
 - **Ghidul Primăriei:** nu contrazice specificația. Notat: „treat gaps as unknown”, „Romanian first”, WCAG 2.1 AA, „private by default”, Sesizări ca unic canal pentru probleme (nu trimitem sesizări, doar link), `/api/zones` e BROWSER OK (opțional, neimplementat încă).
 
+## Finisare finală (14.11.2026, noaptea)
+Checkpoint: tag `checkpoint-before-final-polish` (commit 492c3ec; arborele identic cu HEAD de atunci, verificat cu `git archive`). Restaurare: `git checkout checkpoint-before-final-polish`.
+
+**Probleme raportate de pe iPhone 14 și rezolvate:**
+- **Harta întunecată prea întunecată:** în modul întunecat, harta nu mai e inversată, ci estompată (`brightness .8, contrast 1.06, saturate .78`): străzile rămân deschise, etichetele lizibile, culorile A–E și ruta albastră ies în evidență. Stil „Întunecată” opțional (inversare mai deschisă) și „Luminoasă” în Hartă → Straturi. Punctul „Locația mea” mai mare, cu halou pulsatil; marcajele rapoartelor mai mari, deasupra altor straturi.
+- **Panoul de rută acoperea prea mult:** `SnapSheet` cu 3 poziții (compact ~186 px pe 390×844, extins ~56%, complet), tragere cu viteză, apăsare pe mâner, săgeți din tastatură, derulare internă, `safe-area`. La fiecare schimbare, traseul A→B e reîncadrat între planificator și panou (verificat: ambele ace vizibile, 470 px de hartă liberă pe iPhone 14).
+- **Prezentarea rutei:** în poziția compactă: destinația, minute, km, problemele cunoscute, disponibilitatea măsurătorilor („Fără măsurători de confort pe această rută” / „Măsurat X% · Y% confortabil”), „Recomandată” doar când datele o susțin. Extins: verdictul onest, alternativele, „Ce poți face” (Vezi ruta / Urmărește-mă / Înregistrează, fără promisiuni de navigație pas cu pas), opțiuni de rutare (trotuare, pavaj OSM).
+
+**Audit de fluxuri (Chromium, 390×844 / 412×915 / 1440×900 / 844×390 landscape; GPS simulat prin suprascrierea `navigator.geolocation`, pentru că browserul de test nu are GPS):** Locația mea → punct + con de direcție + urmărire; căutare „Bulevardul Eroilor” (index local) și „Strada Paris 2” (Photon, rezultate reale din Cetate); selectare → rută 583 m cu „Fără măsurători…”; extins/complet/compact prin apăsare și prin tragere reală; „Urmărește-mă” (558 m · 2 min, fără indicații de viraj) și Oprește; raport nou → marcaj pe hartă → editare → ștergere; import prin `<input type=file>` real cu exportul iPhone → pagina turei „nu putem estima confortul” (staționar); reimport → mesaj informativ cu „Deschide tura”; ștergerea turei → listă goală și toast; tură live pornită → Hartă/Traseu/Mai mult/Ture → înregistrarea continuă (15 m → 55 m) → Stop/Termină → procesată, watcher-ele GPS oprite; GPS refuzat → „Nu avem locația ta” + „Alege punctul de plecare”; desktop: panoul devine flotant în stânga; landscape: butoanele panoului rămân vizibile, fără derulare orizontală.
+
+**Bug-uri găsite în audit și reparate:**
+- O tură fără date de la senzorii de mișcare (permisiune refuzată pe iPhone sau browser fără IMU) eșua la procesare („motion.csv nu conține date”). Acum se importă cu traseul GPS, durata din GPS și mesajul „tura are doar traseul GPS… nu putem măsura vibrațiile”.
+- Chrome pe desktop trimite evenimente `devicemotion` goale: erau numărate ca date și apărea „senzorii s-au oprit”. Acum sunt ignorate („senzorii nu trimit date”).
+- Căutarea locală nu găsea strada când textul avea număr („Strada Paris 2”).
+- Două butoane de localizare suprapuse → un singur buton (urmărește / oprește urmărirea), reținut în sesiune.
+- Două benzi roșii simultane în tură → doar cea mai importantă.
+- „Harta s-a actualizat” apărea și când nu se schimba nimic → mesaj explicit „Harta nu s-a schimbat: …”.
+- Reimportul apărea ca eroare → informare cu link spre tura existentă.
+- Titluri goale pe Compară/Grafic; acțiune duplicată „Șterge toate datele” în Parametri (rămâne în Confidențialitate).
+- Leaflet: straturi adăugate pe o hartă deja eliminată (vizibil la reîncărcarea modulelor în dezvoltare) → gardă `alive(map)`; ErrorBoundary prinde orice altă eroare de ecran.
+
+**Actualizări pentru utilizatorii existenți:** service worker-ul nou se activează imediat (`skipWaiting` + `clientsClaim`), deci și instalările vechi îl primesc; reîncărcarea paginii se face automat doar când e sigur — nu în timpul unei ture, al unui raport deschis sau al unui import; altfel apare „Versiune nouă instalată · Reîncarcă”. Verificare la revenirea în aplicație și la 30 min; buton „Caută actualizări” în Mai mult (cu versiunea și ora build-ului). Worker-ul de procesare se încarcă la pornire, ca o actualizare în timpul turei să nu-l facă indisponibil.
+
+**Teste:** 108/108 (13 fișiere). Noi: import → hartă actualizată → reimport refuzat → ștergerea scoate exact contribuția (muchiile identice cu starea dinainte) prin store; staționar → zero RVI, zero străzi colorate; GPS > 20 m → zero potriviri; tură doar GPS; logica panoului (poziție după tragere); numărul casei în căutarea locală.
+
+**Nevalidat:** nimic din această etapă nu a fost testat pe iPhone/Samsung fizic (senzori, Wake Lock, cameră, instalare, tastatura iOS). Nicio calibrare a claselor: nu există încă o tură reală pe bicicletă.
+
+**Următorii pași:** tura reală (lista rapidă din `docs/TEREN.md`); pe iPhone: instalare, import Sensor Logger din Fișiere, tură live de 2 minute cu ecranul aprins, o fotografie într-un raport; apoi `inspect` / `build-layer` / `validate` pe laptop și calibrarea pe segmentele de referință.
+
 ## Phase 2 — produs mobil (14.11.2026, seara)
 Checkpoint înainte de redesign: tag `checkpoint-pre-redesign` (commit 64697a0), 40/40 teste.
 

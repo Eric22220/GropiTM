@@ -1,5 +1,39 @@
 # Protocolul turelor de teren
 
+## Lista rapidă pentru mâine (fără laptop)
+
+**Acasă, înainte de plecare (10 min)**
+1. Pe iPhone, deschide ShockGrid de pe ecranul principal → **Mai mult → Caută actualizări**. Trebuie să scrie „Ai cea mai nouă versiune”.
+2. Telefoane încărcate (≥ 80%). Suport ferm pe ghidon; telefonul nu se mișcă dacă scuturi ghidonul.
+3. În **Sensor Logger** (pe ambele telefoane), la senzori: **Accelerometer, Gyroscope, versiunile Uncalibrated, Location** pornite; frecvența **100 Hz**.
+4. **Test de 1 minut afară:** pornește înregistrarea în Sensor Logger, mergi pe jos 1 minut cu telefonul blocat, oprește → **Export → ZIP** → salvează în Fișiere / Descărcări → ShockGrid → **Ture → Importă**. Trebuie să apară tura cu GPS (traseul pe hartă). Mesajul „nu putem estima confortul” e normal pentru mers pe jos.
+
+**Pe traseu**
+5. Pornește înregistrarea în Sensor Logger **înainte** de primul segment, din oprire. Telefonul poate fi blocat.
+6. Mergi normal, ~15–25 km/h. Nu atinge telefonul în mers.
+7. Fiecare segment de referință (asfalt bun ~200 m, pavaj ~150 m) și fiecare traseu A→B: **de 2 ori**, cu aceeași bicicletă și același telefon. O înregistrare separată pentru fiecare, cu nume clar (ex. `AB-traseu1-dus`).
+8. Dacă vezi o problemă a drumului: **oprește-te**, apoi ShockGrid → **Raportează** (sau „Marchează pentru mai târziu”).
+
+**După fiecare înregistrare (din oprire)**
+9. Sensor Logger → **Export → ZIP** → ShockGrid → **Ture → Importă**.
+10. Dacă apare „Am observat N posibile denivelări”, răspunde **Da / Nu / Nu știu** pentru fiecare.
+11. Pe pagina turei verifică: distanța, „Cât de confortabil a fost” (are culori?) și „Harta s-a actualizat”. După a 2-a trecere pe aceeași stradă, linia devine **plină** (măsurat sigur).
+12. **Ture → tura → Detalii → „Cât de confortabil ți s-a părut (1–5)”**: notează imediat.
+
+**Ce NU e o problemă**
+- Linie întreruptă = o singură trecere sau GPS slab. Normal după prima tură.
+- Străzile fără culoare = încă nemăsurate.
+- „Nu avem încă suficiente măsurători pentru o recomandare de confort” pe rute nemăsurate = corect.
+
+**Ce trebuie notat (pentru echipă)**
+- Ora fiecărui segment de referință și a fiecărui traseu, numele fișierelor.
+- Obstacolele de referință (capace, rosturi): adresa aproximativă.
+- Orice ecran care s-a blocat sau mesaj ciudat: o captură de ecran.
+
+**Seara, pe laptop:** copiază toate ZIP-urile în `rides/` și urmează secțiunea „La întoarcere” de mai jos.
+
+---
+
 ## Siguranță
 Pe lumină, suport ferm pe ghidon, viteză normală, fără atingerea telefonului în mers, fără manevre forțate peste obstacole. Toate marcajele și adnotările se fac **din oprire**.
 

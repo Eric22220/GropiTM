@@ -34,7 +34,10 @@
 - **Locația:** precizia GPS (cercul albastru) nu garantează poziția exactă; viteza și direcția se afișează doar când sunt credibile. „Pornește” arată poziția pe rută și distanța rămasă, fără navigație pas cu pas sau indicații vocale.
 - **Căutarea de adrese** prin Photon (komoot) e un serviciu public gratuit, fără garanție de disponibilitate; textul căutat ajunge la el. Fără rețea rămân străzile din indexul local și alegerea pe hartă. Adresele cu număr depind de completitudinea OpenStreetMap.
 - **Rapoartele sunt doar locale.** Nu există o bază comună; nimeni altcineva nu le vede (vezi `docs/BACKEND-COMUNITAR.md`).
-- **Nu a fost testat pe iPhone/Samsung fizic** (senzori, Wake Lock, permisiuni, fotografie): toate verificările de interfață sunt în Chromium, la dimensiunile ecranelor, cu senzori simulați în teste.
+- **Nu a fost testat pe iPhone/Samsung fizic** (senzori, Wake Lock, permisiuni, fotografie, tastatura iOS, modul instalat): toate verificările de interfață sunt în Chromium, la dimensiunile ecranelor, cu GPS și senzori simulați.
+- **Fără senzori de mișcare** (permisiune refuzată), tura live păstrează doar traseul GPS: nu se calculează confort și nu se detectează denivelări.
+- **Actualizări:** o versiune nouă se aplică automat doar când nu e o tură, un import sau un raport în curs; altfel apare „Versiune nouă instalată · Reîncarcă”. Pe iPhone, dacă aplicația pare veche: Mai mult → Caută actualizări, sau închide complet aplicația și redeschide-o.
+- **Harta în modul întunecat** e harta OpenStreetMap estompată (nu un stil întunecat dedicat); stilul „Întunecată” e o inversare a culorilor, cu etichete mai puțin fidele.
 
 ## Despre colectare
 - Un site web **nu poate citi senzorii cu ecranul stins**. Înregistratorul propriu (P1) cere ecranul aprins (Screen Wake Lock); pentru turele de teren folosim **Sensor Logger**.

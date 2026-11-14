@@ -7,6 +7,7 @@ import { UPlot } from '../charts/UPlot';
 import { CLASS_COLORS, fmt, fmtLen } from '../format';
 import { drawComfort, drawTrack, drawZones } from '../map/draw';
 import { L, useLayerGroup, useLeaflet } from '../map/useLeaflet';
+import { neighbourhoodOf } from '../zones';
 
 export function MapPage({ focus }: { focus?: string }) {
   const graph = useApp((s) => s.graph);
@@ -70,10 +71,11 @@ export function MapPage({ focus }: { focus?: string }) {
               <label className="check"><input type="checkbox" checked={showTracks} onChange={(e) => setShowTracks(e.target.checked)} />{t.map.tracks}</label>
             </div>
             {graphStatus !== 'ready' && <div className="banner warn">{graphStatus === 'loading' ? 'Se încarcă graful străzilor…' : t.map.noGraph}</div>}
+            {graphStatus === 'ready' && counts.m + counts.l === 0 && <div className="banner info">Încă nu există segmente măsurate. <a href="#/import">Importă o tură</a> pe bicicletă (2,5–9 m/s, cu GPS): segmentele apar imediat.</div>}
           </div>
         )}
       </div>
-      {sel?.edge && graph && <EdgePanel e={sel.edge} name={graph.name[sel.edge.edge_id]} len={graph.length[sel.edge.edge_id]} osmSurface={graph.surface[sel.edge.edge_id]} highway={graph.highway[sel.edge.edge_id]} version={layer.processing_version} onClose={() => setSel(null)} />}
+      {sel?.edge && graph && <EdgePanel key={sel.edge.edge_id} e={sel.edge} name={graph.name[sel.edge.edge_id]} len={graph.length[sel.edge.edge_id]} osmSurface={graph.surface[sel.edge.edge_id]} highway={graph.highway[sel.edge.edge_id]} version={layer.processing_version} mid={(() => { const g = graph.geometry(sel.edge.edge_id); return g[Math.floor(g.length / 2)]; })()} onClose={() => setSel(null)} />}
       {sel?.zone && <ZonePanel z={sel.zone} onClose={() => setSel(null)} />}
     </>
   );
@@ -83,7 +85,11 @@ function srcLabel(s: string) {
   return s === 'sensorlogger' ? 'Sensor Logger' : s === 'shockgrid' ? 'ShockGrid (înregistrator propriu)' : 'format vechi';
 }
 
-function EdgePanel({ e, name, len, osmSurface, highway, version, onClose }: { e: EdgeAgg; name: string; len: number; osmSurface: string; highway: string; version: string; onClose: () => void }) {
+function EdgePanel({ e, name, len, osmSurface, highway, version, mid, onClose }: { e: EdgeAgg; name: string; len: number; osmSurface: string; highway: string; version: string; mid: [number, number]; onClose: () => void }) {
+  const [hood, setHood] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const worst = e.status === 'MEASURED' && (e.class === 'D' || e.class === 'E');
+  const report = `Bună ziua. Segmentul ${name || 'de stradă'} (${highway}${hood ? `, cartierul ${hood}` : ''}), lângă coordonatele ${mid[0].toFixed(5)}, ${mid[1].toFixed(5)}, are o suprafață foarte denivelată pentru bicicletă: măsurătorile cu telefonul pe ghidon (${e.n_passes} treceri, ultima pe ${e.last_seen}) îl plasează în clasa ${e.class} din A–E (indice relativ de vibrație ${fmt(e.rms_median, 2)} m/s²). Vă rog să verificați starea suprafeței. Mulțumesc.`;
   return (
     <div className="overlay bottom" role="dialog" aria-label="Detaliile segmentului">
       <button className="closebtn" onClick={onClose} aria-label={t.common.close}>✕</button>
@@ -104,7 +110,19 @@ function EdgePanel({ e, name, len, osmSurface, highway, version, onClose }: { e:
         <dt>ambiguitate carosabil/trotuar</dt><dd>{fmt(e.ambiguous_ratio * 100, 0, '%')}</dd>
         <dt>suprafață declarată în OSM</dt><dd>{osmSurface || 'nedeclarată'} (nu intră în RVI)</dd>
         <dt>versiunea algoritmului</dt><dd>{version}</dd>
+        <dt>cartier</dt><dd>{hood ?? <button className="small" onClick={async () => { const h = await neighbourhoodOf(mid[0], mid[1]); setHood(h ? `${h.name}` : 'necunoscut'); }}>Află (Primăria, /api/zones)</button>}</dd>
       </dl>
+      {worst && (
+        <details>
+          <summary>Text pentru o sesizare (P2)</summary>
+          <p className="small">{report}</p>
+          <div className="row">
+            <button onClick={async () => { try { await navigator.clipboard.writeText(report); setCopied(true); } catch { setCopied(false); } }}>{copied ? 'Copiat' : 'Copiază textul'}</button>
+            <a className="btn" href="https://sesizari.primariatm.ro/" target="_blank" rel="noopener">Deschide Sesizări</a>
+          </div>
+          <p className="small muted">ShockGrid nu trimite sesizări: le faci tu, pe canalul oficial, dacă vrei.</p>
+        </details>
+      )}
     </div>
   );
 }

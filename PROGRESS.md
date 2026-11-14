@@ -15,5 +15,36 @@ Fișier de reluare: ce merge, ce a fost verificat și cum, ce nu merge. Cel mai 
 - **Zona cu șoc — „treceri”:** numărul de treceri al zonei = trecerile muchiei pe care stă (din agregarea RVI), minim numărul de detectări. Nu publicăm trasee, deci nu putem număra trecerile prin rază din snapshot.
 - **Ghidul Primăriei:** nu contrazice specificația. Notat: „treat gaps as unknown”, „Romanian first”, WCAG 2.1 AA, „private by default”, Sesizări ca unic canal pentru probleme (nu trimitem sesizări, doar link), `/api/zones` e BROWSER OK (opțional, neimplementat încă).
 
-## Stare
-(actualizat la fiecare fază — vezi mai jos)
+## Stare (14.11.2026)
+
+### Faza 0 — import Sensor Logger, schelet, deploy: GATA
+- Ramura `prototip-vechi` publicată (vechiul `index.html`, commit 5499550); aplicația nouă pe `main`, fără force push. `sample-data/`, `rides/`, PDF-ul ghidului: în `.gitignore`, necomise.
+- GitHub Pages trecut de pe „legacy (branch)” pe „GitHub Actions”. Workflow `deploy.yml`: `npm ci → npm test → npm run build → deploy`. **Verificat:** rulările 43546834469, 43547092995, 43547344661 = success; `https://eric22220.github.io/ShockGrid/` răspunde 200 (index, manifest, sw.js).
+- `npm run inspect` pe exporturile reale (verificat local):
+  - iPhone 14: ios, unitate g, AccelerometerUncalibrated + GyroscopeUncalibrated, 238,4 s, 23877 mostre, **100,2 Hz, 0 goluri > 100 ms**, **237 fixuri**, precizie mediană 6,8 m, 169 fixuri ≤ 20 m, 6,0 m, gravitație estimată 9,810 m/s². → criteriul fazei 0 îndeplinit.
+  - Samsung SM-S948B: android, m/s², TotalAcceleration + Gyroscope, 49,5 s, 58,5 Hz, 0 goluri, 72 fixuri, precizie 4,0 m, distanță 0,0 m (toate vitezele < 0,5 m/s; spec. 2.2 estima ~16 m deplasare pe jos, sub pragul de integrare), gravitație 9,766.
+- **Bug critic găsit și reparat:** exporturile Sensor Logger sunt ZIP64 (dimensiuni 0xFFFFFFFF în antete). `unzipSync` din fflate cerea un buffer de 4 GB în browser („Array buffer allocation failed”), deși în Node mergea. Cititor propriu de director central ZIP64 (`src/core/io/zip.ts`) + test. **Verificat în browser** (Chromium, dev server): import iPhone 192 ms, Samsung 53 ms, prin Web Worker; reimportul aceleiași ture e refuzat cu mesaj.
+- Ecranul Import: alegere ZIP, progres, rezumat (cifrele de mai sus), traseul pe hartă, diferența înainte/după pe strat.
+
+### Faza 2 — graful străzilor și nucleul de vibrație: GATA (de calibrat pe date reale)
+- Graful: GitHub Actions, relația OSM 6927733 (Timișoara, admin_level=8). Prima rulare: **23460 noduri, 32981 muchii, 1689,8 km; `footway=sidewalk` desenat separat: 228,6 km; piste (`highway=cycleway`): 37,7 km; 90 de componente, cea principală 98,5% din noduri.** (Prima rulare n-a putut face push din cauza unui commit paralel; workflow-ul face acum `pull --rebase`.)
+- Nucleul (`src/core/`): validare mostre, fs local, gravitație LP τ=1 s, a_v = d·u, HP Butterworth 4 Hz cu coeficienți recalculați la ±10% fs, ferestre 2 s/1 s cu motivele de excludere, șocuri cu prag adaptiv MAD, grupare roată față/spate, double_hit, NEEDS_REVIEW, distanță (viteză / poziții), VDV.
+- **Nevalidat încă pe tură reală:** filtrul de 4 Hz pe spectrul unui segment neted, pragurile claselor, pragurile de șoc (lipsesc turele de teren).
+
+### Fazele 3–4 — map-matching, hartă, replay, rutare, comparație: IMPLEMENTATE
+- Map-matching cu index pe grilă (60 m), cost distanță + direcție + adiacență, salturi imposibile ignorate (confirmare după 3 fixuri), ambiguitate carosabil/trotuar/pistă, suprafață declarată.
+- Harta: MEASURED pe clase (paletă pentru daltoniști + literă), LOW_CONFIDENCE întrerupt, UNKNOWN fără culoare; panou pe segment cu toate câmpurile 8.3; zone cu șoc comutabile, cu semnalul de ±3 s.
+- Rutarea: A* + heap binar, profiluri 0/1/3, P_unknown reglabil, trotuare opționale, estimare OSM opțională, metri pe clase măsurat/estimat/necunoscut, regula de 50%.
+- Comparația: RVI ponderat cu distanța, bootstrap pe blocuri de 10, VDV, timp pe clase, avertisment viteză > 20%, grafic rms_v vs distanță, porțiuni.
+- Actualizare reactivă (8.6): strat = agregare(snapshot, ture locale) cu versiune; cache rutare indexat după versiune; diferența înainte/după + dacă ruta recomandată s-a schimbat și de ce.
+
+### Faza 0b — înregistratorul propriu (P1): IMPLEMENTAT, netestat pe telefon
+- devicemotion (permisiunea iOS cerută sincron în click), watchPosition, Wake Lock, loturi de 1 s în IndexedDB, recuperare după reîncărcare, banner roșu, Pauză/Stop/Reper, export ZIP (7.1) prin Web Share. Diagnostic (5.3) cu pașii pentru PERMISSION_DENIED pe iPhone.
+
+### Teste (Vitest)
+36 trecute, 2 sărite până la graful real (schema + A* vs Dijkstra pe 100 de perechi). Acoperă: CSV/BOM/null, ns epoch, unitate, Sensor Logger sintetic + ambele exporturi reale, ZIP64, format vechi, refuz .xlsx, export ShockGrid, biquad la 100/58,5/40 Hz, invarianța la rotire, RMS, excluderi (viteză, gol, giroscop, fs), VDV, distanță (staționar < 5 m; 5 m/s ±10% ambele metode), șocuri + double_hit, A* (drum minim, sens unic, trotuare), regula 50%, 8.6 (schimbarea rutei după import și revenirea după ștergere, dublura, ordinea, versiunea/cache-ul), monotonia Σ length·P, map-matching (ambiguitate, suprafață declarată, precizie > 20 m).
+
+### Ce lipsește / următorii pași
+- Turele de teren (Faza 1) și calibrarea pe ele: `npm run inspect`, `build-layer`, `validate` pe `rides/`. Snapshotul publicat e gol până atunci (harta arată doar turele importate pe telefon).
+- Test pe telefoanele reale (iPhone Safari, Samsung Chrome): import, instalare PWA, înregistrator.
+- Testul cu utilizatori: neefectuat.

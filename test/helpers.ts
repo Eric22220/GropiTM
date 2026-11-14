@@ -24,6 +24,25 @@ export function makeGraph(nodes: [number, number][], edges: { f: number; t: numb
   return new Graph(json);
 }
 
+/** funcție de poziție de-a lungul unei polilinii, la viteză constantă (+ zgomot GPS determinist) */
+export function pathAlong(pts: [number, number][], speed: number, noiseM = 0, seed = 3): { path: (s: number) => [number, number]; seconds: number } {
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + haversine(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]));
+  const total = cum[cum.length - 1];
+  let st = seed;
+  const rnd = () => ((st = (st * 16807) % 2147483647) / 2147483647 - 0.5) * 2;
+  let nx = 0, ny = 0;
+  const path = (s: number): [number, number] => {
+    const d = Math.min(total, s * speed);
+    let i = 1;
+    while (i < cum.length - 1 && cum[i] < d) i++;
+    const w = cum[i] > cum[i - 1] ? (d - cum[i - 1]) / (cum[i] - cum[i - 1]) : 0;
+    nx = 0.8 * nx + rnd() * noiseM * 0.6; ny = 0.8 * ny + rnd() * noiseM * 0.6;
+    return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * w + ny / 111195, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * w + nx / 77600];
+  };
+  return { path, seconds: total / speed };
+}
+
 /** tură sintetică: telefon cu gravitația pe axa `axis`, vibrație verticală sinusoidală + zgomot determinist */
 export function syntheticRide(opts: {
   seconds: number;
@@ -60,7 +79,10 @@ export function syntheticRide(opts: {
   for (let k = 0; k <= seconds * gpsHz; k++) {
     const s = k / gpsHz;
     const [lat, lon] = path(s);
-    gps.push({ t: t0 + s * 1000, lat, lon, acc: opts.acc ?? 5, alt: null, speed: opts.speed === undefined ? 5 : opts.speed, heading: 0, speedAcc: null });
+    const prev = gps[gps.length - 1];
+    let heading = 0;
+    if (prev) { heading = (Math.atan2((lon - prev.lon) * 77600, (lat - prev.lat) * 111195) * 180) / Math.PI; if (heading < 0) heading += 360; }
+    gps.push({ t: t0 + s * 1000, lat, lon, acc: opts.acc ?? 5, alt: null, speed: opts.speed === undefined ? 5 : opts.speed, heading, speedAcc: null });
   }
   const gyroT: number[] = [], gyroM: number[] = [];
   for (let i = 0; i < T.length; i++) { gyroT.push(T[i]); gyroM.push(opts.gyroDeg ? opts.gyroDeg((T[i] - t0) / 1000) : 5); }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { CLASSES } from '../../core/aggregate';
 import { PROFILES, type ProfileKey, type RouteStats } from '../../core/route';
 import { t } from '../../i18n/ro';
@@ -14,6 +14,7 @@ export function RoutePage() {
   const ab = useApp((s) => s.ab);
   const settings = useApp((s) => s.settings);
   const [panelOpen, setPanelOpen] = useState(true);
+  const fitted = useRef<string>('');
   const { ref, map } = useLeaflet({
     onClick: (lat, lon) => {
       if (!ab.a || (ab.a && ab.b)) setAB({ a: [lat, lon], b: null });
@@ -39,8 +40,16 @@ export function RoutePage() {
       }
       return L.polyline(pts, { color, weight, opacity: 0.9, dashArray: dash, interactive: false }).addTo(g);
     };
-    if (routes?.shortest) draw(routes.shortest.r.edges, '#222', 9, '2 10');
-    if (routes?.chosen && settings.profile !== 'shortest') draw(routes.chosen.r.edges, '#00b3a4', 5);
+    const ls = routes?.shortest ? draw(routes.shortest.r.edges, '#222', 9, '2 10') : null;
+    const lc = routes?.chosen && settings.profile !== 'shortest' ? draw(routes.chosen.r.edges, '#00b3a4', 5) : null;
+    const key = `${ab.a}|${ab.b}`;
+    if (ls && fitted.current !== key) {
+      const b = ls.getBounds();
+      if (lc) b.extend(lc.getBounds());
+      // panoul de jos acoperă partea de jos a hărții
+      map!.fitBounds(b, { paddingTopLeft: [30, 30], paddingBottomRight: [30, Math.round(map!.getSize().y * 0.45)], maxZoom: 17 });
+      fitted.current = key;
+    }
     if (ab.a) L.marker(ab.a, { icon: L.divIcon({ className: '', html: '<div style="background:#1d5c2e;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;border:2px solid #fff">A</div>', iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(g);
     if (ab.b) L.marker(ab.b, { icon: L.divIcon({ className: '', html: '<div style="background:#8a1111;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;border:2px solid #fff">B</div>', iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(g);
   }, [graph, routes, ab, settings.profile]);

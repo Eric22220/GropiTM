@@ -11,6 +11,14 @@ export const ro = {
     REPEATED: 'Repetat', CANDIDATE: 'Candidat', NEEDS_REVIEW: 'De verificat', REJECTED: 'Respins',
   },
   classes: { A: 'neted', B: 'ușor denivelat', C: 'denivelat', D: 'foarte denivelat', E: 'extrem de denivelat' },
+  classShort: { A: 'Neted', B: 'Bun', C: 'Acceptabil', D: 'Denivelat', E: 'Foarte denivelat' },
+  classPlain: {
+    A: 'Rulare lină, aproape fără zdruncinături.',
+    B: 'Mici vibrații, confortabil.',
+    C: 'Vibrații vizibile; acceptabil pe distanțe scurte.',
+    D: 'Zdruncinături dese; obositor.',
+    E: 'Foarte denivelat: pavaj, gropi sau rosturi dese.',
+  },
   surface: { carosabil: 'carosabil', pista: 'pistă', trotuar: 'trotuar', alee: 'alee', mixt: 'mixt' },
   reasons: {
     ok: 'validă', gap: 'gol în date', hidden: 'pagină ascunsă', low_fs: 'frecvență prea mică', settling: 'stabilizare filtre',

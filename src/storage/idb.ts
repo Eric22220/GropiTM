@@ -19,25 +19,61 @@ export interface RecChunk {
   data: unknown;
 }
 
+export type ReportType = 'groapa' | 'denivelare' | 'capac' | 'rost' | 'asfalt' | 'obstacol' | 'alta' | 'nespecificat';
+export type ReportStatus = 'draft' | 'local';
+
+/** Raport personal: stă DOAR pe acest dispozitiv. Nu există o bază comună de rapoarte. */
+export interface LocalReport {
+  id: string;
+  created_at: number;
+  updated_at: number;
+  lat: number;
+  lon: number;
+  acc: number | null;
+  type: ReportType;
+  description: string;
+  photo: Blob | null;
+  /** draft = „marcat pentru mai târziu” (doar poziție și moment); local = completat */
+  status: ReportStatus;
+  source: 'manual' | 'quick' | 'shock';
+  shock_ref?: string; // `${ride_id}:${shock_id}` pentru denivelările confirmate după tură
+}
+
 interface SGDB extends DBSchema {
   rides: { key: string; value: StoredRide };
   kv: { key: string; value: unknown };
   rec: { key: number; value: RecChunk; indexes: { session: string } };
+  reports: { key: string; value: LocalReport };
 }
 
 let dbp: Promise<IDBPDatabase<SGDB>> | null = null;
 export function db() {
   if (!dbp)
-    dbp = openDB<SGDB>('shockgrid', 1, {
-      upgrade(d) {
-        d.createObjectStore('rides', { keyPath: 'ride_id' });
-        d.createObjectStore('kv');
-        const r = d.createObjectStore('rec', { keyPath: 'id', autoIncrement: true });
-        r.createIndex('session', 'session');
+    dbp = openDB<SGDB>('shockgrid', 2, {
+      upgrade(d, oldVersion) {
+        if (oldVersion < 1) {
+          d.createObjectStore('rides', { keyPath: 'ride_id' });
+          d.createObjectStore('kv');
+          const r = d.createObjectStore('rec', { keyPath: 'id', autoIncrement: true });
+          r.createIndex('session', 'session');
+        }
+        if (oldVersion < 2) d.createObjectStore('reports', { keyPath: 'id' });
       },
     });
   return dbp;
 }
+
+/** doar pentru teste: închide și uită conexiunea */
+export async function _resetDb() {
+  if (dbp) (await dbp).close();
+  dbp = null;
+}
+
+export async function listReports(): Promise<LocalReport[]> {
+  try { return (await (await db()).getAll('reports')).sort((a, b) => b.created_at - a.created_at); } catch { return []; }
+}
+export async function putReport(r: LocalReport) { await (await db()).put('reports', r); }
+export async function deleteReport(id: string) { await (await db()).delete('reports', id); }
 
 export async function listRides(): Promise<StoredRide[]> {
   try {
@@ -59,6 +95,7 @@ export async function clearAll() {
   await d.clear('rides');
   await d.clear('kv');
   await d.clear('rec');
+  await d.clear('reports');
 }
 export async function recAppend(c: RecChunk) { await (await db()).add('rec', c); }
 export async function recGet(session: string): Promise<RecChunk[]> { return (await db()).getAllFromIndex('rec', 'session', session); }

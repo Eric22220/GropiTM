@@ -15,6 +15,9 @@ import {
 import type { DeclaredSurface, ProcessedRide } from '../core/types';
 import * as idb from '../storage/idb';
 import { processInWorker } from '../worker/client';
+import type { Place } from '../services/geocode';
+import { createReport, shockKey, type ReviewAnswer, type ShockReview } from '../services/reports';
+import type { Shock } from '../core/types';
 
 export interface Settings {
   cfg: VibrationConfig;
@@ -41,7 +44,16 @@ export interface RoutePair {
   error?: string;
 }
 
+export interface Plan {
+  origin: Place | null;
+  dest: Place | null;
+}
+
 export interface AppState {
+  reports: idb.LocalReport[];
+  reviews: Record<string, ShockReview>;
+  recent: Place[];
+  plan: Plan;
   graph: Graph | null;
   graphStatus: 'loading' | 'ready' | 'missing' | 'error';
   snapshot: Snapshot | null;
@@ -69,6 +81,10 @@ const defaultSettings: Settings = {
 };
 
 let state: AppState = {
+  reports: [],
+  reviews: {},
+  recent: [],
+  plan: { origin: null, dest: null },
   graph: null,
   graphStatus: 'loading',
   snapshot: null,
@@ -107,6 +123,7 @@ function buildLayer(rides: idb.StoredRide[], version: number, s: AppState = stat
     cfg: s.settings.cfg,
     surfaceKindOf: g ? (e) => g.kind[e] ?? null : undefined,
     rejected: new Set(s.rejected),
+    confirmed: new Set(Object.entries(s.reviews).filter(([, r]) => r.answer === 'yes').map(([k]) => k)),
     fixedThresholds: s.settings.fixedThresholds,
     version,
   });
@@ -127,7 +144,10 @@ export async function init() {
   const ab = (await idb.kvGet<AppState['ab']>('ab')) ?? { a: null, b: null };
   const settings: Settings = { ...defaultSettings, ...(saved ?? {}), cfg: { ...DEFAULT_CONFIG, ...(saved?.cfg ?? {}) }, route: { ...DEFAULT_ROUTE_OPTIONS, ...(saved?.route ?? {}) } };
   const rides = (await idb.listRides()).map((r) => ({ ...r, file: null }));
-  set({ settings, rejected, ab, rides });
+  const reviews = (await idb.kvGet<Record<string, ShockReview>>('shock-reviews')) ?? {};
+  const recent = (await idb.kvGet<Place[]>('recent-places')) ?? [];
+  const plan = (await idb.kvGet<Plan>('plan')) ?? { origin: null, dest: null };
+  set({ settings, rejected, ab, rides, reviews, recent, plan, reports: await idb.listReports() });
   recompute(rides);
   set({ ready: true });
 
@@ -308,6 +328,67 @@ export async function rejectZone(memberIds: string[], reject: boolean) {
 
 export async function wipeAll() {
   await idb.clearAll();
-  set({ rides: [], rejected: [], lastImport: null, ab: { a: null, b: null }, settings: defaultSettings });
+  set({ rides: [], rejected: [], lastImport: null, ab: { a: null, b: null }, settings: defaultSettings, reports: [], reviews: {}, recent: [], plan: { origin: null, dest: null } });
   recompute([]);
+}
+
+// ---------------- rapoarte personale (doar pe dispozitiv) ----------------
+export async function saveReport(r: idb.LocalReport) {
+  await idb.putReport(r);
+  set({ reports: [r, ...state.reports.filter((x) => x.id !== r.id)].sort((a, b) => b.created_at - a.created_at) });
+}
+
+export async function removeReport(id: string) {
+  await idb.deleteReport(id);
+  const reviews = Object.fromEntries(Object.entries(state.reviews).map(([k, v]) => [k, v.report_id === id ? { ...v, report_id: undefined } : v]));
+  set({ reports: state.reports.filter((x) => x.id !== id), reviews });
+  await idb.kvSet('shock-reviews', reviews).catch(() => {});
+}
+
+/** Răspunsul utilizatorului pentru o denivelare candidată: Da → raport local; Nu → detectarea e respinsă. */
+export async function reviewShock(rideId: string, shock: Shock, answer: ReviewAnswer, type?: idb.ReportType) {
+  const key = shockKey(rideId, shock.id);
+  const prev = state.reviews[key];
+  let report_id = prev?.report_id;
+  if (answer === 'yes' && shock.lat !== null && shock.lon !== null) {
+    const existing = report_id ? state.reports.find((r) => r.id === report_id) : undefined;
+    const rep = existing
+      ? { ...existing, type: type ?? existing.type, status: 'local' as const, updated_at: Date.now() }
+      : createReport({ lat: shock.lat, lon: shock.lon, acc: shock.r, type: type ?? 'nespecificat', source: 'shock', shock_ref: key, now: shock.t });
+    if (rep.type === 'nespecificat') rep.status = 'draft';
+    await saveReport(rep);
+    report_id = rep.id;
+  } else if (answer !== 'yes' && report_id) {
+    await idb.deleteReport(report_id);
+    set({ reports: state.reports.filter((x) => x.id !== report_id) });
+    report_id = undefined;
+  }
+  const reviews = { ...state.reviews, [key]: { answer, type: answer === 'yes' ? type : undefined, report_id, at: Date.now() } };
+  set({ reviews });
+  await idb.kvSet('shock-reviews', reviews).catch(() => {});
+  const rej = new Set(state.rejected);
+  if (answer === 'no') rej.add(key); else rej.delete(key);
+  set({ rejected: [...rej] });
+  await idb.kvSet('rejected', [...rej]).catch(() => {});
+  recompute();
+}
+
+// ---------------- planificarea rutei ----------------
+export async function setPlan(plan: Plan) {
+  set({ plan, ab: { a: plan.origin ? [plan.origin.lat, plan.origin.lon] : null, b: plan.dest ? [plan.dest.lat, plan.dest.lon] : null } });
+  await idb.kvSet('plan', { origin: plan.origin?.kind === 'mylocation' ? plan.origin : plan.origin, dest: plan.dest }).catch(() => {});
+  await idb.kvSet('ab', state.ab).catch(() => {});
+}
+
+/** istoric local de destinații (max. 8), niciodată publicat */
+export async function addRecent(p: Place) {
+  if (p.kind === 'mylocation') return;
+  const recent = [{ ...p, source: 'recent' as const }, ...state.recent.filter((x) => !(Math.abs(x.lat - p.lat) < 1e-5 && Math.abs(x.lon - p.lon) < 1e-5))].slice(0, 8);
+  set({ recent });
+  await idb.kvSet('recent-places', recent).catch(() => {});
+}
+
+export async function clearRecent() {
+  set({ recent: [] });
+  await idb.kvSet('recent-places', []).catch(() => {});
 }

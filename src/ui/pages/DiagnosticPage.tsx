@@ -58,12 +58,11 @@ export function DiagnosticPage() {
   const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
   return (
     <div className="stack">
-      <h1>Diagnostic</h1>
-      <button className="primary big" onClick={run} disabled={running}>{running ? 'Se măsoară 5 s… ține telefonul nemișcat' : 'Testează senzorii și GPS-ul'}</button>
+      <button className="btn primary block lg" onClick={run} disabled={running}>{running ? 'Se măsoară 5 s… ține telefonul nemișcat' : 'Testează senzorii și GPS-ul'}</button>
       <div className="card">
         <dl className="kv small">{lines.map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd>{v}</dd></Fragment>)}</dl>
       </div>
-      <button onClick={async () => { try { await navigator.clipboard.writeText(text); setCopied(true); } catch { setCopied(false); } }}>{copied ? 'Copiat' : 'Copiază rezultatul'}</button>
+      <button className="btn block" onClick={async () => { try { await navigator.clipboard.writeText(text); setCopied(true); } catch { setCopied(false); } }}>{copied ? 'Copiat' : 'Copiază rezultatul'}</button>
       {geoCode === 'PERMISSION_DENIED' && isIOS && (
         <div className="banner warn">
           <b>Localizarea e refuzată pe iPhone. Verifică, în ordine:</b>

@@ -1,23 +1,26 @@
-import { t } from '../../i18n/ro';
+import { BookOpen, Database, Flag, Lock, Wrench } from 'lucide-react';
+import { useApp } from '../../state/store';
+import { Item } from '../kit';
 
 export function MorePage() {
-  const items: [string, string, string][] = [
-    ['#/compare', t.nav.compare, 'Două trasee parcurse efectiv între aceleași puncte'],
-    ['#/record', t.nav.record, 'Înregistrator propriu (P1): ecranul trebuie să rămână aprins'],
-    ['#/about', t.nav.about, 'Surse, limitări, exporturi GeoJSON, ce date stocăm'],
-    ['#/diag', t.nav.diag, 'Senzori, frecvență, GPS și permisiuni pe acest telefon'],
-    ['#/settings', t.nav.settings, 'Ștergerea datelor locale, configurația (Developer)'],
-    ['#/', t.nav.home, ''],
-  ];
+  const reports = useApp((s) => s.reports);
   return (
-    <div className="stack">
-      <h1>{t.nav.more}</h1>
-      {items.map(([h, l, d]) => (
-        <a key={h} href={h} className="btn big" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-          <span>{l}</span>
-          {d && <span className="small muted">{d}</span>}
-        </a>
-      ))}
-    </div>
+    <main className="screen"><div className="wrap stack">
+      <h1>Mai mult</h1>
+      <div className="list">
+        <Item href="#/reports" icon={<Flag />} tone="danger" title="Rapoartele mele" sub={reports.length ? `${reports.length} pe acest telefon` : 'Problemele pe care le-ai semnalat'} />
+      </div>
+      <div className="section-label">Despre</div>
+      <div className="list">
+        <Item href="#/more/method" icon={<BookOpen />} tone="primary" title="Cum măsurăm confortul" sub="Metodologia, pe scurt și în detaliu" />
+        <Item href="#/more/data" icon={<Database />} tone="comfort" title="Date și surse" sub="Ce e publicat, exporturi GeoJSON pentru instituții" />
+        <Item href="#/more/privacy" icon={<Lock />} title="Confidențialitate" sub="Ce date stocăm și unde" />
+      </div>
+      <div className="section-label">Pentru echipă și testare</div>
+      <div className="list">
+        <Item href="#/more/advanced" icon={<Wrench />} tone="warn" title="Instrumente avansate" sub="Diagnostic senzori, parametri, validare" />
+      </div>
+      <p className="xs muted" style={{ textAlign: 'center', marginTop: 24 }}>ShockGrid {__APP_VERSION__} · UniHack 2026 · cod MIT, date © OpenStreetMap contributors (ODbL)</p>
+    </div></main>
   );
 }

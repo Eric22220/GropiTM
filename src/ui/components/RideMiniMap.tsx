@@ -5,7 +5,7 @@ import { drawTrack } from '../map/draw';
 export function RideMiniMap({ p, extra }: { p: ProcessedRide; extra?: ProcessedRide }) {
   const { ref, map } = useLeaflet({ zoom: 14 });
   useLayerGroup(map, (g) => {
-    const pl = drawTrack(g, p.track, '#0b3d5c', false, 4);
+    const pl = drawTrack(g, p.track, "#1857f5", false, 4);
     const pl2 = extra ? drawTrack(g, extra.track, '#e66101', true, 4) : null;
     const b = pl?.getBounds();
     if (pl2 && b) b.extend(pl2.getBounds());
@@ -18,5 +18,5 @@ export function RideMiniMap({ p, extra }: { p: ProcessedRide; extra?: ProcessedR
     }
     for (const s of p.shocks) if (s.lat !== null && s.lon !== null) L.circleMarker([s.lat, s.lon], { radius: 5, color: '#6a00a8', fillOpacity: s.needs_review ? 0 : 0.8 }).bindTooltip(`șoc ${s.peak.toFixed(1)} m/s²`).addTo(g);
   }, [p, extra]);
-  return <div ref={ref} className="mapbox inline" role="region" aria-label="Traseul turei pe hartă" />;
+  return <div ref={ref} className="map inline tall" role="region" aria-label="Traseul turei pe hartă" />;
 }

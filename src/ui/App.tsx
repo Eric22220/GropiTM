@@ -1,18 +1,24 @@
-import { useEffect, useState } from 'react';
-import { t } from '../i18n/ro';
-import { useApp } from '../state/store';
-import { AboutPage } from './pages/AboutPage';
+import { Bike, Map as MapIcon, Menu, Navigation } from 'lucide-react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { rideActive, subscribeRide } from '../services/ride';
+import { ErrorBoundary } from './ErrorBoundary';
+import { Header, Toaster } from './kit';
+import { AdvancedPage } from './pages/AdvancedPage';
 import { ComparePage } from './pages/ComparePage';
-import { DiagnosticPage } from './pages/DiagnosticPage';
-import { HomePage } from './pages/HomePage';
+import { DataPage } from './pages/DataPage';
 import { ImportPage } from './pages/ImportPage';
-import { MapPage } from './pages/MapPage';
+import { MapScreen } from './pages/MapScreen';
+import { MethodologyPage } from './pages/MethodologyPage';
 import { MorePage } from './pages/MorePage';
-import { RecordPage } from './pages/RecordPage';
+import { PrivacyPage } from './pages/PrivacyPage';
+import { RecordScreen } from './pages/RecordScreen';
 import { ReplayPage } from './pages/ReplayPage';
+import { ReportScreen } from './pages/ReportScreen';
+import { ReportsPage } from './pages/ReportsPage';
+import { ReviewScreen } from './pages/ReviewScreen';
+import { RideDetail } from './pages/RideDetail';
 import { RidesPage } from './pages/RidesPage';
-import { RoutePage } from './pages/RoutePage';
-import { SettingsPage } from './pages/SettingsPage';
+import { RouteScreen } from './pages/RouteScreen';
 
 function useHash() {
   const [h, setH] = useState(() => location.hash.slice(1) || '/');
@@ -24,59 +30,57 @@ function useHash() {
   return h;
 }
 
-export function go(path: string) {
-  location.hash = path;
-}
+export function go(path: string) { location.hash = path; }
 
-const NAV: [string, string, string][] = [
-  ['/map', t.nav.map, '🗺'],
-  ['/route', t.nav.route, '↗'],
-  ['/import', t.nav.import, '⤓'],
-  ['/rides', t.nav.rides, '≡'],
-  ['/more', t.nav.more, '⋯'],
+type Tab = 'map' | 'route' | 'rides' | 'more';
+const TABS: { id: Tab; href: string; label: string; Icon: typeof MapIcon }[] = [
+  { id: 'map', href: '#/', label: 'Hartă', Icon: MapIcon },
+  { id: 'route', href: '#/route', label: 'Traseu', Icon: Navigation },
+  { id: 'rides', href: '#/rides', label: 'Ture', Icon: Bike },
+  { id: 'more', href: '#/more', label: 'Mai mult', Icon: Menu },
 ];
 
 export function App() {
   const path = useHash();
-  const ready = useApp((s) => s.ready);
-  const [, base, arg] = path.split('/');
+  const [pathname, query = ''] = path.split('?');
+  const [, base = '', arg, arg2] = pathname.split('/');
+  const params = new URLSearchParams(query);
+  const recording = useSyncExternalStore(subscribeRide, rideActive);
   let page: JSX.Element;
+  let tab: Tab = 'map';
+  let navHidden = false;
   switch (base) {
-    case 'map': page = <MapPage focus={arg} />; break;
-    case 'route': page = <RoutePage />; break;
-    case 'import': page = <ImportPage />; break;
-    case 'rides': page = <RidesPage />; break;
-    case 'ride': page = <ReplayPage id={arg} />; break;
-    case 'compare': page = <ComparePage />; break;
-    case 'about': page = <AboutPage />; break;
-    case 'diag': page = <DiagnosticPage />; break;
-    case 'settings': page = <SettingsPage />; break;
-    case 'record': page = <RecordPage />; break;
-    case 'more': page = <MorePage />; break;
-    default: page = <HomePage />;
+    case '': case 'map': page = <MapScreen focus={arg} />; break;
+    case 'route': tab = 'route'; page = <RouteScreen focus={params.get('focus')} />; break;
+    case 'rides': tab = 'rides'; page = <RidesPage />; break;
+    case 'import': tab = 'rides'; page = <ImportPage />; break;
+    case 'record': tab = 'rides'; navHidden = true; page = <RecordScreen />; break;
+    case 'ride': tab = 'rides'; page = arg2 === 'replay' ? <main className="screen"><div className="wrap"><Header title="" back={`#/ride/${arg}`} /><ReplayPage id={arg} /></div></main> : <RideDetail id={arg} />; break;
+    case 'review': tab = 'rides'; page = <ReviewScreen id={arg} />; break;
+    case 'compare': tab = 'rides'; page = <main className="screen"><div className="wrap"><Header title="" back="#/rides" /><ComparePage /></div></main>; break;
+    case 'report': tab = 'map'; navHidden = true; page = <ReportScreen id={arg} quick={params.get('quick') === '1'} lat={Number(params.get('lat'))} lon={Number(params.get('lon'))} />; break;
+    case 'reports': tab = 'more'; page = <ReportsPage />; break;
+    case 'more':
+      tab = 'more';
+      page = arg === 'method' ? <MethodologyPage /> : arg === 'data' ? <DataPage /> : arg === 'privacy' ? <PrivacyPage /> : arg === 'advanced' ? <AdvancedPage sub={arg2} /> : <MorePage />;
+      break;
+    default: page = <MapScreen />;
   }
-  const fullMap = base === 'map' || base === 'route';
   return (
-    <div className={`app ${fullMap ? 'app-map' : ''}`}>
-      <header className="topbar">
-        <a href="#/" className="brand" aria-label="ShockGrid, acasă">
-          <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width={28} height={28} />
-          <span>{t.app.name}</span>
-        </a>
-        {!ready && <span className="muted small">{t.common.loading}</span>}
-      </header>
-      <main className={fullMap ? 'main-map' : 'main'} id="main">{page}</main>
-      <nav className="bottomnav" aria-label="Navigare principală">
-        {NAV.map(([p, label, icon]) => {
-          const active = `/${base}` === p || (p === '/more' && ['about', 'diag', 'settings', 'record', 'compare', 'more'].includes(base));
-          return (
-            <a key={p} href={`#${p}`} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
-              <span aria-hidden="true" className="navicon">{icon}</span>
+    <div className="app">
+      <ErrorBoundary resetKey={pathname}>{page}</ErrorBoundary>
+      {!navHidden && (
+        <nav className="nav" aria-label="Navigare principală">
+          {TABS.map(({ id, href, label, Icon }) => (
+            <a key={id} href={href} aria-current={tab === id ? 'page' : undefined}>
+              <Icon aria-hidden="true" />
               <span>{label}</span>
+              {id === 'rides' && recording && <i className="dot" aria-label="tură în curs" />}
             </a>
-          );
-        })}
-      </nav>
+          ))}
+        </nav>
+      )}
+      <Toaster />
     </div>
   );
 }

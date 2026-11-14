@@ -91,6 +91,7 @@ export interface ShockZone {
   surface_kind: SurfaceKind | null;
   strongest: { peak: number; snippet?: { dt: number; v: number[] }; speed: number | null; double_hit: boolean; date: string; flags: string[] };
   members: string[]; // id-urile detectărilor
+  confirmed?: number; // câte detectări au fost confirmate de utilizator (local)
 }
 
 export interface ComfortLayer {
@@ -132,6 +133,8 @@ export interface AggregateInput {
   cfg?: VibrationConfig;
   surfaceKindOf?: (edge: number) => SurfaceKind | null;
   rejected?: Set<string>;
+  /** detectări confirmate de utilizator după tură (informativ; nu schimbă statusul algoritmic și nici costul rutei) */
+  confirmed?: Set<string>;
   fixedThresholds?: Thresholds | null;
   version?: number;
 }
@@ -235,6 +238,8 @@ export function aggregate(inp: AggregateInput): ComfortLayer {
   }
 
   const zones = aggregateShocks(snap, rides, out, inp.surfaceKindOf, inp.rejected ?? new Set());
+  const conf = inp.confirmed ?? new Set<string>();
+  for (const z of zones) z.confirmed = z.members.filter((m) => conf.has(m)).length;
   return {
     version: inp.version ?? 0,
     processing_version: cfg.processing_version,

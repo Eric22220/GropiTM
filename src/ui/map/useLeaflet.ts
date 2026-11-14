@@ -4,20 +4,28 @@ import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
 import { TIMISOARA_CENTER } from '../../core/geo';
 
-export function useLeaflet(opts: { zoom?: number; onClick?: (lat: number, lon: number) => void } = {}) {
+export function useLeaflet(opts: { zoom?: number; center?: [number, number]; onClick?: (lat: number, lon: number) => void; onDrag?: () => void; interactive?: boolean } = {}) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<L.Map | null>(null);
   const clickRef = useRef(opts.onClick);
   clickRef.current = opts.onClick;
+  const dragRef = useRef(opts.onDrag);
+  dragRef.current = opts.onDrag;
   useEffect(() => {
     if (!ref.current) return;
-    const m = L.map(ref.current, { preferCanvas: true, zoomControl: false, tapTolerance: 20 }).setView(TIMISOARA_CENTER, opts.zoom ?? 13);
-    L.control.zoom({ position: 'topright' }).addTo(m);
+    const interactive = opts.interactive !== false;
+    const m = L.map(ref.current, {
+      preferCanvas: true, zoomControl: false, attributionControl: false, tapTolerance: 20,
+      dragging: interactive, scrollWheelZoom: interactive, touchZoom: interactive, doubleClickZoom: interactive, boxZoom: false, keyboard: interactive,
+    }).setView(opts.center ?? TIMISOARA_CENTER, opts.zoom ?? 13);
+    L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(m);
+    if (interactive && window.innerWidth >= 900) L.control.zoom({ position: 'bottomright' }).addTo(m);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(m);
     m.on('click', (e: L.LeafletMouseEvent) => clickRef.current?.(e.latlng.lat, e.latlng.lng));
+    m.on('dragstart', () => dragRef.current?.());
     setMap(m);
     const ro = new ResizeObserver(() => m.invalidateSize());
     ro.observe(ref.current);

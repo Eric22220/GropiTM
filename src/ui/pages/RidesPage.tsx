@@ -1,70 +1,67 @@
-import { useState } from 'react';
-import type { DeclaredSurface } from '../../core/types';
-import { t } from '../../i18n/ro';
-import { getRideFile, removeRide, reprocessRide, setDeclaredSurface, setIncluded, setRideFields, useApp } from '../../state/store';
-import { fmt, fmtDateTime, fmtLen, shareOrDownload } from '../format';
+import { Bike, FileDown, GitCompare, Play, Upload } from 'lucide-react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { recoverSession, rideActive, subscribeRide } from '../../services/ride';
+import { recDelete, recSessions } from '../../storage/idb';
+import { useApp } from '../../state/store';
+import { fmtLen } from '../format';
+import { Banner, Item, toast } from '../kit';
+import { go } from '../App';
 
 export function RidesPage() {
   const rides = useApp((s) => s.rides);
-  const cfgVersion = useApp((s) => s.settings.cfg.processing_version);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
+  const reviews = useApp((s) => s.reviews);
+  const recording = useSyncExternalStore(subscribeRide, rideActive);
+  const [orphans, setOrphans] = useState<string[]>([]);
+  useEffect(() => { if (!recording) recSessions().then(setOrphans).catch(() => {}); }, [recording]);
   const sorted = [...rides].sort((a, b) => b.processed.meta.start_ms - a.processed.meta.start_ms);
   return (
-    <div className="stack">
-      <h1>{t.nav.rides} ({rides.length})</h1>
-      <p className="small muted">Turele sunt private și rămân pe acest dispozitiv (IndexedDB). Nimic nu se încarcă automat. Includerea în stratul de confort e o alegere explicită, pe tură.</p>
-      {msg && <p className="banner info small" role="status">{msg}</p>}
-      {!rides.length && <p>{t.home.noRides} <a href="#/import">{t.home.importBtn}</a></p>}
-      {sorted.map((r) => {
-        const p = r.processed;
-        const s = p.summary;
-        return (
-          <div key={r.ride_id} className="card stack">
-            <div>
-              <b>{p.meta.label || r.file_name}</b>
-              <div className="small muted">{fmtDateTime(p.meta.start_ms)} · {p.meta.source === 'sensorlogger' ? 'Sensor Logger' : p.meta.source} · {p.meta.device ?? ''} · id {r.ride_id}</div>
-              <div className="small">{fmtLen(s.distance_m)} · {fmt(s.fs_median, 0, 'Hz')} · {s.n_fix} fixuri · {s.n_windows_valid}/{s.n_windows} ferestre valide · {s.n_shocks} șocuri · potrivite {p.match.windows_matched}</div>
-              {p.processing_version !== cfgVersion && <div className="banner warn small">Procesată cu {p.processing_version}; configurația curentă e {cfgVersion}.</div>}
-            </div>
-            <label className="check"><input type="checkbox" checked={r.included} onChange={(e) => setIncluded(r.ride_id, e.target.checked)} />Inclusă în stratul de confort</label>
-            <div className="grid2">
-              <label className="small">Eticheta
-                <input type="text" defaultValue={p.meta.label ?? ''} placeholder="ex. AB-traseu1-dus" onBlur={(e) => setRideFields(r.ride_id, { label: e.target.value })} />
-              </label>
-              <label className="small">Suprafața declarată
-                <select value={p.meta.declared_surface ?? ''} onChange={(e) => setDeclaredSurface(r.ride_id, (e.target.value || null) as DeclaredSurface)}>
-                  <option value="">{t.import.declaredNone}</option>
-                  <option value="carosabil">{t.surface.carosabil}</option>
-                  <option value="pista">{t.surface.pista}</option>
-                  <option value="trotuar">{t.surface.trotuar}</option>
-                  <option value="mixt">{t.surface.mixt}</option>
-                </select>
-              </label>
-              <label className="small">Confort perceput (1–5)
-                <select value={r.perceived ?? ''} onChange={(e) => setRideFields(r.ride_id, { perceived: e.target.value ? Number(e.target.value) : null })}>
-                  <option value="">nenotat</option>
-                  {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-              </label>
-            </div>
-            <div className="row">
-              <a className="btn" href={`#/map/${r.ride_id}`}>Pe hartă</a>
-              <a className="btn" href={`#/ride/${r.ride_id}`}>Replay</a>
-              <button disabled={!!busy} onClick={async () => {
-                const f = await getRideFile(r.ride_id);
-                if (!f) { setMsg('Fișierul original nu mai e disponibil.'); return; }
-                await shareOrDownload(r.file_name.endsWith('.zip') ? r.file_name : `${r.file_name}.zip`, f);
-              }}>Exportă tura</button>
-              <button disabled={!!busy} onClick={async () => {
-                setBusy(r.ride_id);
-                try { await reprocessRide(r.ride_id); setMsg('Tura a fost reprocesată.'); } catch (e) { setMsg((e as Error).message); } finally { setBusy(null); }
-              }}>{busy === r.ride_id ? 'Se reprocesează…' : 'Reprocesează'}</button>
-              <button className="danger" onClick={async () => { if (confirm('Ștergi tura de pe acest dispozitiv? Contribuția ei dispare din hartă. Nu se poate anula.')) await removeRide(r.ride_id); }}>{t.common.delete}</button>
-            </div>
+    <main className="screen"><div className="wrap stack">
+      <h1>Ture</h1>
+      {recording ? (
+        <a className="card tint-danger" href="#/record" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+          <div className="row"><span className="chip live"><span className="rec-dot" /> În curs</span><b>Tura ta se înregistrează</b></div>
+          <p className="small" style={{ margin: '8px 0 0' }}>Deschide ecranul turei</p>
+        </a>
+      ) : (
+        <div className="grid2">
+          <a className="card tint-primary" href="#/record" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <Play style={{ color: 'var(--primary)' }} /><h3 style={{ marginTop: 8 }}>Pornește o tură</h3><p className="xs muted" style={{ margin: 0 }}>Înregistrează vibrațiile cu acest telefon, ecranul aprins</p>
+          </a>
+          <a className="card tint-comfort" href="#/import" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <Upload style={{ color: 'var(--comfort)' }} /><h3 style={{ marginTop: 8 }}>Importă</h3><p className="xs muted" style={{ margin: 0 }}>ZIP din Sensor Logger (merge și cu ecranul blocat)</p>
+          </a>
+        </div>
+      )}
+      {orphans.map((s) => (
+        <Banner key={s} kind="warn">
+          O tură a fost întreruptă înainte de oprire.
+          <div className="row" style={{ marginTop: 8 }}>
+            <button className="btn sm primary" onClick={async () => { const r = await recoverSession(s); setOrphans((o) => o.filter((x) => x !== s)); if (r.rideId) go(`/ride/${r.rideId}`); else toast(r.error ?? 'Nu s-a putut recupera.'); }}>Recuperează</button>
+            <button className="btn sm ghost" onClick={async () => { if (confirm('Ștergi datele turei întrerupte? Nu se poate anula.')) { await recDelete(s); setOrphans((o) => o.filter((x) => x !== s)); } }}>Șterge</button>
           </div>
-        );
-      })}
-    </div>
+        </Banner>
+      ))}
+      <div className="row spread">
+        <div className="section-label" style={{ margin: '8px 4px 0' }}>Istoric ({rides.length})</div>
+        {rides.length >= 2 && <a className="btn sm ghost" href="#/compare"><GitCompare /> Compară</a>}
+      </div>
+      {!rides.length ? (
+        <div className="empty card"><Bike aria-hidden="true" /><p>Încă nu ai ture pe acest telefon.</p></div>
+      ) : (
+        <div className="list">
+          {sorted.map((r) => {
+            const p = r.processed;
+            const unreviewed = p.shocks.filter((s) => s.located && !reviews[`${r.ride_id}:${s.id}`]).length;
+            return (
+              <Item key={r.ride_id} href={`#/ride/${r.ride_id}`} icon={p.meta.source === 'sensorlogger' ? <FileDown /> : <Bike />} tone={p.meta.source === 'sensorlogger' ? 'comfort' : 'primary'}
+                title={p.meta.label || r.file_name.replace(/\.zip$/i, '')}
+                sub={`${new Date(p.meta.start_ms).toLocaleString('ro-RO', { dateStyle: 'medium', timeStyle: 'short' })} · ${fmtLen(p.summary.distance_m)}${p.meta.source === 'sensorlogger' ? ' · Sensor Logger' : ''}`}
+                right={unreviewed > 0 ? <span className="badge warn">{unreviewed} de verificat</span> : undefined} />
+            );
+          })}
+        </div>
+      )}
+      <p className="xs muted">Turele rămân doar pe acest telefon. Nimic nu se încarcă automat.</p>
+    </div></main>
   );
 }

@@ -66,7 +66,7 @@ export function ReplayPage({ id }: { id?: string }) {
           onCursor={onCursor}
         />
       )}
-      <div ref={ref} className="mapbox inline" role="region" aria-label="Traseul turei" />
+      <div ref={ref} className="map inline tall" role="region" aria-label="Traseul turei" />
       <RideSummaryCard p={p} />
     </div>
   );

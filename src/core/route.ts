@@ -6,7 +6,6 @@ import { haversine } from './geo';
 export interface RouteOptions {
   w_c: number;
   p_unknown: number;
-  allowSidewalks: boolean;
   useOsmSurface: boolean;
 }
 
@@ -15,7 +14,7 @@ export type ProfileKey = keyof typeof PROFILES;
 
 export const P_CLASS: Record<ComfortClass, number> = { A: 0, B: 0.15, C: 0.4, D: 0.9, E: 1.6 };
 
-export const DEFAULT_ROUTE_OPTIONS: RouteOptions = { w_c: 1, p_unknown: 0.3, allowSidewalks: false, useOsmSurface: false };
+export const DEFAULT_ROUTE_OPTIONS: RouteOptions = { w_c: 1, p_unknown: 0.3, useOsmSurface: false };
 
 /** penalizarea estimată din eticheta OSM (opțiune oprită implicit); null = nicio estimare */
 export function osmSurfacePenalty(g: Graph, e: number): number | null {
@@ -27,15 +26,24 @@ export function osmSurfacePenalty(g: Graph, e: number): number | null {
   return p;
 }
 
-export function routable(g: Graph, e: number, allowSidewalks: boolean): boolean {
-  if (g.highway[e] === 'steps') return false;
-  const k = g.kind[e];
-  if (k === 'trotuar' || k === 'alee') {
-    const b = g.bicycle[e];
-    if (b === 'yes' || b === 'designated') return true;
-    return allowSidewalks;
-  }
-  return true;
+/** Valori OSM `bicycle=*` care interzic mersul pe bicicletă pe acea cale (inclusiv „use_sidepath”:
+ * pe carosabil e obligatorie pista alăturată, cartografiată separat). */
+export const BIKE_FORBIDDEN = new Set(['no', 'dismount', 'use_sidepath', 'private']);
+
+/** De ce nu se poate merge pe bicicletă pe muchie (null = permis). Mersul pe jos cu bicicleta de mână
+ * NU e un mod de rutare: trotuarele obișnuite nu sunt folosite niciodată. */
+export function bikeBlockReason(g: Graph, e: number): string | null {
+  const hw = g.highway[e], b = g.bicycle[e], k = g.kind[e];
+  if (hw === 'steps') return 'trepte';
+  if (BIKE_FORBIDDEN.has(b)) return `bicycle=${b}`;
+  if (k === 'pista') return null;
+  if (k === 'trotuar') return b === 'yes' || b === 'designated' ? null : 'trotuar fără drept pentru biciclete';
+  if (k === 'alee') return b === 'yes' || b === 'designated' || b === 'permissive' ? null : `${hw} fără drept pentru biciclete`;
+  return null;
+}
+
+export function routable(g: Graph, e: number): boolean {
+  return bikeBlockReason(g, e) === null;
 }
 
 export type EdgeCategory = 'measured' | 'low' | 'osm' | 'unknown';
@@ -103,13 +111,13 @@ export class Router {
   constructor(readonly g: Graph) {}
 
   costs(layer: ComfortLayer | null, o: RouteOptions): Float64Array {
-    const key = `${layer?.version ?? -1}|${o.w_c}|${o.p_unknown}|${o.allowSidewalks}|${o.useOsmSurface}`;
+    const key = `${layer?.version ?? -1}|${o.w_c}|${o.p_unknown}|${o.useOsmSurface}`;
     let c = this.cache.get(key);
     if (c) return c;
     if (this.cache.size > 12) this.cache.clear();
     c = new Float64Array(this.g.nEdges);
     for (let e = 0; e < this.g.nEdges; e++) {
-      if (!routable(this.g, e, o.allowSidewalks)) { c[e] = Infinity; continue; }
+      if (!routable(this.g, e)) { c[e] = Infinity; continue; }
       c[e] = this.g.length[e] * (1 + o.w_c * penaltyOf(this.g, layer, e, o).p);
     }
     this.cache.set(key, c);
@@ -179,7 +187,7 @@ export interface RouteStats {
   measured_m: number; // MEASURED + LOW_CONFIDENCE
   measured_pct: number;
   unknown_pct: number;
-  insufficient: boolean; // > 50% UNKNOWN
+  insufficient: boolean; // < 50% din lungime măsurat (necunoscut + estimat OSM > 50%)
   comfort_sum: number; // Σ length × P_confort
   de_measured_m: number; // metri măsurați în D–E
 }
@@ -187,18 +195,20 @@ export interface RouteStats {
 export function routeStats(g: Graph, layer: ComfortLayer | null, r: RouteResult, o: RouteOptions): RouteStats {
   const zero = () => ({ A: 0, B: 0, C: 0, D: 0, E: 0 });
   const byClass = { measured: zero(), low: zero() };
-  let osm = 0, unknown = 0, comfort = 0, de = 0;
+  let osm = 0, unknown = 0, comfort = 0, de = 0, measured = 0;
   for (const { edge } of r.edges) {
     const L = g.length[edge];
     const p = penaltyOf(g, layer, edge, o);
     comfort += L * p.p;
     if ((p.cat === 'measured' || p.cat === 'low') && p.cls) {
       byClass[p.cat][p.cls] += L;
+      measured += L;
       if (p.cls === 'D' || p.cls === 'E') de += L;
     } else if (p.cat === 'osm') osm += L;
     else unknown += L;
   }
-  const measured = r.length - osm - unknown;
+  // însumat direct (nu prin scădere): „lungime − necunoscut” lăsa reziduuri de virgulă mobilă (~1e-13 m)
+  // care făceau o rută nemăsurată să pară „măsurată 0%”
   return {
     length: r.length,
     minutes: r.length / (15000 / 60),
@@ -208,14 +218,14 @@ export function routeStats(g: Graph, layer: ComfortLayer | null, r: RouteResult,
     measured_m: measured,
     measured_pct: r.length ? (100 * measured) / r.length : 0,
     unknown_pct: r.length ? (100 * unknown) / r.length : 0,
-    insufficient: r.length > 0 && unknown / r.length > 0.5,
+    insufficient: r.length > 0 && measured / r.length < 0.5,
     comfort_sum: comfort,
     de_measured_m: de,
   };
 }
 
 /** Componenta conexă principală (neorientată), pentru a lipi A și B doar de noduri rutabile. */
-export function mainComponent(g: Graph, allowSidewalks: boolean): Uint8Array {
+export function mainComponent(g: Graph): Uint8Array {
   const comp = new Int32Array(g.nNodes).fill(-1);
   const sizes: number[] = [];
   const stack: number[] = [];
@@ -229,7 +239,7 @@ export function mainComponent(g: Graph, allowSidewalks: boolean): Uint8Array {
       const u = stack.pop()!;
       size++;
       for (const e of g.edgesAt(u)) {
-        if (!routable(g, e, allowSidewalks)) continue;
+        if (!routable(g, e)) continue;
         const v = g.from[e] === u ? g.to[e] : g.from[e];
         if (comp[v] < 0) { comp[v] = c; stack.push(v); }
       }

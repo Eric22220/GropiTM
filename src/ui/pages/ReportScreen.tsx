@@ -61,6 +61,7 @@ export function ReportScreen({ id, lat, lon }: { id?: string; quick?: boolean; l
     <main className="screen" style={{ paddingBottom: 32 }}><div className="wrap stack">
       <Header title={isNew ? 'Raportează o problemă' : existing.status === 'draft' ? 'Completează raportul' : 'Raportul tău'} back={isNew ? '#/' : '#/reports'} />
       {isNew && <Banner kind="info">Oprește-te într-un loc sigur înainte să completezi.</Banner>}
+      <span className="badge" style={{ alignSelf: 'flex-start' }}>Se salvează doar pe acest telefon · nu e trimis nimănui</span>
       <div style={{ position: 'relative' }}>
         <div ref={ref} className="map inline tall" role="application" aria-label="Mută harta pentru a ajusta locul problemei" />
         <div className="pick-center" aria-hidden="true"><div className="pin" style={{ background: '#c2261b' }}><span>!</span></div></div>
@@ -80,7 +81,7 @@ export function ReportScreen({ id, lat, lon }: { id?: string; quick?: boolean; l
         <div style={{ position: 'relative' }}><img src={photoUrl} alt="Fotografia problemei" className="photo-thumb" /><button className="icon-btn" style={{ position: 'absolute', top: 8, right: 8 }} onClick={() => setPhoto(null)} aria-label="Elimină fotografia"><X /></button></div>
       ) : <button className="btn block ghost" onClick={() => fileIn.current?.click()}><Camera /> Adaugă o fotografie</button>}
       <label className="field"><span>Descriere</span><textarea value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={1000} placeholder="ex. groapă adâncă lângă bordură, pe banda de biciclete" /></label>
-      <button className="btn primary block lg" onClick={save} disabled={!point || saving}><Check /> {existing ? 'Salvează modificările' : 'Salvează raportul'}</button>
+      <button className="btn primary block lg" onClick={save} disabled={!point || saving}><Check /> {existing ? 'Salvează modificările' : 'Salvează pe telefon'}</button>
       <p className="xs muted" style={{ textAlign: 'center' }}>{VISIBILITY_LABEL.device}. Nu e trimis nimănui automat. Fotografia e micșorată și fără metadate GPS.</p>
       {existing && existing.status === 'local' && <SesizareBox text={sesizareText(existing, street)} photo={existing.photo} />}
       {existing && <button className="btn danger block" onClick={async () => { if (confirm('Ștergi raportul de pe acest telefon? Nu se poate anula.')) { await removeReport(existing.id); go('/reports'); } }}><Trash2 /> Șterge raportul</button>}

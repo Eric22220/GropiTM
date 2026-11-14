@@ -37,7 +37,7 @@ export function RideDetail({ id }: { id?: string }) {
       </div>
       {lastImport?.ride_id === r.ride_id && (
         lastImport.diff.new_covered === 0 && lastImport.diff.passes_added === 0 && lastImport.diff.rvi_changes.length === 0 ? (
-          <Banner kind="info"><b>Harta nu s-a schimbat:</b> {s.n_motion === 0 ? 'tura are doar traseul GPS (senzorii de mișcare nu au trimis date), deci nu putem măsura vibrațiile.' : 'tura nu are porțiuni de mers la 2,5–9 m/s cu GPS bun potrivite pe străzi (de exemplu o înregistrare staționară). Nu calculăm confort din ea.'}</Banner>
+          <Banner kind="info"><b>Harta nu s-a schimbat:</b> {s.n_motion === 0 ? 'tura are doar traseul GPS (senzorii de mișcare nu au trimis date), deci nu putem măsura vibrațiile.' : s.n_fix === 0 ? 'tura nu are poziții GPS (locația a fost refuzată sau indisponibilă): vibrațiile s-au măsurat, dar nu pot fi puse pe hartă.' : 'tura nu are porțiuni de mers la 2,5–9 m/s cu GPS bun potrivite pe străzi (de exemplu o înregistrare staționară). Nu calculăm confort din ea.'}</Banner>
         ) : <Banner kind={lastImport.diff.new_covered > 0 ? 'ok' : 'info'}>
           <b>Harta s-a actualizat.</b> Străzi cu date: {fmt(lastImport.diff.km_before, 2)} → {fmt(lastImport.diff.km_after, 2)} km; {lastImport.diff.new_covered} segmente noi, {lastImport.diff.new_measured} măsurate sigur, {lastImport.diff.passes_added} treceri adăugate.
           {lastImport.route.status !== 'none' && <> {lastImport.route.text}</>}

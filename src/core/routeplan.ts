@@ -13,11 +13,41 @@ export interface RouteOptionView {
   problems: { zones: number; reports: number };
 }
 
+/** Verdictul despre confort. Reguli (fără excepții):
+ * - o rută cu < MIN_COVERAGE_PCT% din lungime măsurată are confort NECUNOSCUT;
+ * - nu spunem niciodată că o rută e „mai confortabilă”, „optimă” sau „la fel de confortabilă” decât dacă
+ *   ambele rute comparate sunt măsurate suficient și diferența măsurată e reală. */
 export type Verdict =
-  | { kind: 'nodata'; text: string }
-  | { kind: 'insufficient'; text: string }
-  | { kind: 'same'; text: string }
-  | { kind: 'better'; text: string; best: ProfileKey };
+  | { kind: 'nodata'; text: string } // nicio măsurătoare pe nicio variantă
+  | { kind: 'insufficient'; text: string } // câteva măsurători, prea puține pentru o comparație
+  | { kind: 'partial'; text: string } // cea mai scurtă e necunoscută, o alternativă e măsurată: informăm, nu recomandăm
+  | { kind: 'same'; text: string } // cea mai scurtă e măsurată suficient și nu am găsit o alternativă măsurată mai bună
+  | { kind: 'better'; text: string; best: ProfileKey }; // ambele măsurate suficient, alternativa are mai puține vibrații măsurate
+
+/** procentul minim din lungimea rutei care trebuie măsurat ca să vorbim despre confortul ei */
+export const MIN_COVERAGE_PCT = 50;
+/** diferențe minime ca o alternativă să fie numită „cu mai puține vibrații” */
+const MIN_DE_GAIN_M = 10;
+const MIN_GOOD_GAIN_PCT = 10;
+
+/** procent afișabil: o valoare între 0 și 1 nu devine „0%” */
+export const fmtPct = (p: number) => (p > 0 && p < 1 ? 'sub 1%' : `${Math.round(p)}%`);
+export const isCovered = (o: RouteOptionView) => o.s.length > 0 && o.s.measured_pct >= MIN_COVERAGE_PCT;
+
+/** Eticheta de dovezi pentru o rută: verde DOAR pentru o rută recomandată pe baza măsurătorilor. */
+export function routeEvidence(o: RouteOptionView, recommended: boolean): { tone: 'warn' | 'neutral' | 'comfort'; text: string } {
+  if (o.s.measured_m <= 0) return { tone: 'warn', text: 'Confort necunoscut · nemăsurat' };
+  if (!isCovered(o)) return { tone: 'warn', text: `Confort necunoscut · măsurat ${fmtPct(o.s.measured_pct)}` };
+  const good = o.knownGoodPct !== null ? ` · ${Math.round(o.knownGoodPct)}% confortabil` : '';
+  return { tone: recommended ? 'comfort' : 'neutral', text: `Măsurat ${fmtPct(o.s.measured_pct)}${good}` };
+}
+
+function isBetter(a: RouteOptionView, s: RouteOptionView): boolean {
+  if (a.s.de_measured_m > s.s.de_measured_m) return false;
+  const de = s.s.de_measured_m - a.s.de_measured_m;
+  const good = (a.knownGoodPct ?? 0) - (s.knownGoodPct ?? 0);
+  return de >= MIN_DE_GAIN_M || good >= MIN_GOOD_GAIN_PCT;
+}
 
 export interface PlanResult { options: RouteOptionView[]; verdict: Verdict; error?: string }
 
@@ -49,27 +79,38 @@ export function planRoutes(g: Graph, layer: ComfortLayer | null, router: Router,
     };
   });
   const shortest = opts[0];
-  // fără duplicate: o rută identică cu una deja listată nu mai apare
-  const visible: RouteOptionView[] = [shortest];
-  for (const o of opts.slice(1)) {
-    if (visible.some((v) => sameEdges(v.r, o.r))) continue;
-    if (o.s.insufficient) continue; // nu propunem „confort” pe o rută majoritar necunoscută
-    visible.push(o);
-  }
-  const anyMeasured = opts.some((o) => o.s.measured_m > 0);
+  // alternative distincte (fără dubluri)
+  const alts: RouteOptionView[] = [];
+  for (const o of opts.slice(1)) if (!sameEdges(o.r, shortest.r) && !alts.some((v) => sameEdges(v.r, o.r))) alts.push(o);
+  const coveredAlts = alts.filter(isCovered);
+  let visible: RouteOptionView[] = [shortest];
   let verdict: Verdict;
-  if (!anyMeasured) {
-    verdict = { kind: 'nodata', text: 'Nu avem încă suficiente măsurători pentru o recomandare de confort. Îți arătăm cea mai scurtă rută.' };
-  } else if (visible.length === 1) {
-    const alt = opts.slice(1).find((o) => !sameEdges(o.r, shortest.r));
-    verdict = alt && alt.s.insufficient
-      ? { kind: 'insufficient', text: 'Rutele alternative trec mai ales pe străzi nemăsurate, așa că nu putem spune care e mai confortabilă.' }
-      : { kind: 'same', text: `Cea mai scurtă rută e și cea mai confortabilă după datele existente (${Math.round(shortest.s.measured_pct)}% din drum măsurat).` };
+  if (!isCovered(shortest)) {
+    if (coveredAlts.length) {
+      const a = coveredAlts[0];
+      visible = [shortest, a];
+      verdict = { kind: 'partial', text: `Cea mai scurtă rută e măsurată ${fmtPct(shortest.s.measured_pct)}, deci confortul ei e necunoscut. Alternativa (+${Math.round(a.s.length - shortest.s.length)} m) e măsurată ${fmtPct(a.s.measured_pct)}${a.knownGoodPct !== null ? `, ${Math.round(a.knownGoodPct)}% confortabil` : ''}. Nu le putem compara.` };
+    } else if (opts.every((o) => o.s.measured_m <= 0)) {
+      verdict = { kind: 'nodata', text: 'Confort necunoscut: nu avem măsurători pe această rută. Îți arătăm cea mai scurtă rută, fără optimizare după confort.' };
+    } else {
+      verdict = { kind: 'insufficient', text: `Confort necunoscut: doar ${fmtPct(shortest.s.measured_pct)} din rută e măsurat, prea puțin pentru a compara confortul. Îți arătăm cea mai scurtă rută.` };
+    }
   } else {
-    const best = visible[visible.length - 1];
-    const dl = best.s.length - shortest.s.length;
-    const dde = shortest.s.de_measured_m - best.s.de_measured_m;
-    verdict = { kind: 'better', best: best.key, text: `+${Math.round(dl)} m față de cea mai scurtă, cu ${Math.max(0, Math.round(dde))} m mai puțin pe segmente măsurate ca denivelate (D–E).` };
+    const better = coveredAlts.filter((a) => isBetter(a, shortest));
+    if (better.length) {
+      const best = better.reduce((x, y) => (y.s.de_measured_m < x.s.de_measured_m || (y.s.de_measured_m === x.s.de_measured_m && y.s.length < x.s.length) ? y : x));
+      visible = [shortest, best];
+      const dl = Math.round(best.s.length - shortest.s.length);
+      const dde = Math.round(shortest.s.de_measured_m - best.s.de_measured_m);
+      verdict = {
+        kind: 'better', best: best.key,
+        text: dde >= MIN_DE_GAIN_M
+          ? `${dl >= 0 ? '+' : ''}${dl} m față de cea mai scurtă, cu ${dde} m mai puțin pe segmente măsurate ca denivelate (D–E).`
+          : `${dl >= 0 ? '+' : ''}${dl} m față de cea mai scurtă; ${Math.round(best.knownGoodPct ?? 0)}% confortabil (A–B) față de ${Math.round(shortest.knownGoodPct ?? 0)}% pe porțiunile măsurate.`,
+      };
+    } else {
+      verdict = { kind: 'same', text: `Nu am găsit o alternativă măsurată cu mai puține vibrații. Ruta e măsurată ${fmtPct(shortest.s.measured_pct)}${shortest.knownGoodPct !== null ? `, ${Math.round(shortest.knownGoodPct)}% confortabil (A–B)` : ''}.` };
+    }
   }
   return { options: visible, verdict };
 }

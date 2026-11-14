@@ -27,7 +27,24 @@ export function pauseRide() { rec?.pause(); stats = rec?.stats() ?? null; emit()
 export function resumeRide() { rec?.resume(); stats = rec?.stats() ?? null; emit(); }
 export function markRide(detail?: string) { rec?.mark(detail); }
 
-export interface StopResult { rideId: string | null; zip: Uint8Array; error: string | null; shocks: number }
+export interface StopResult { rideId: string | null; zip: Uint8Array; error: string | null; shocks: number; empty?: boolean }
+
+/** reîncearcă sursele după ce utilizatorul a schimbat permisiunile (GPS repornit; permisiunea de mișcare
+ * se cere separat, sincron, din click) */
+export function retryRideSources() { rec?.watchGps(); stats = rec?.stats() ?? null; emit(); }
+
+/** oprește tura fără să o salveze (de ex. nu s-a înregistrat nimic) */
+export async function discardRide() {
+  const r = rec;
+  if (!r) return;
+  rec = null;
+  if (timer !== null) clearInterval(timer);
+  timer = null;
+  stats = null;
+  emit();
+  try { await r.stop(); } catch { /* ignorat */ }
+  await recDelete(r.session).catch(() => {});
+}
 
 export async function stopRide(onProgress?: (s: string, f: number) => void): Promise<StopResult> {
   const r = rec;
@@ -37,7 +54,14 @@ export async function stopRide(onProgress?: (s: string, f: number) => void): Pro
   timer = null;
   stats = null;
   emit();
+  const empty = r.isEmpty();
   const zip = await r.stop();
+  if (empty) {
+    // nimic de salvat: nu creăm o tură goală care să pară reușită
+    await recDelete(r.session).catch(() => {});
+    setTimeout(() => reloadIfSafe(), 4000);
+    return { rideId: null, zip, error: null, shocks: 0, empty: true };
+  }
   try {
     const { ride } = await importBytes(`${r.session}.zip`, zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.byteLength) as ArrayBuffer, null, onProgress);
     await recDelete(r.session);

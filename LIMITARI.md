@@ -23,11 +23,13 @@
 
 ## Despre rutare
 - Nu promitem rute „mai sigure”: nu avem date de accidente. Recomandăm doar rute cu vibrații măsurate mai mici.
-- Dacă peste 50% din lungimea rutei e necunoscută, aplicația spune „Prea puține date pentru o recomandare de confort”.
-- Aplicația nu interpretează legislația; trotuarele fără drept explicit pentru biciclete sunt excluse implicit, după etichetele OSM.
+- Dacă sub 50% din lungimea unei rute e măsurat, confortul ei e **„necunoscut”**. O alternativă e recomandată doar când ambele rute sunt măsurate ≥ 50% și diferența măsurată e reală (≥ 10 m mai puțin în clasele D–E sau ≥ 10 puncte procentuale mai mult în A–B). Nu spunem niciodată „cea mai confortabilă” sau „la fel de confortabilă” fără aceste date.
+- **Doar căi permise bicicletelor, după etichetele OSM:** trotuarele obișnuite (fără `bicycle=yes/designated`), zonele pietonale, potecile și drumurile de câmp fără drept pentru biciclete, treptele, drumurile private și carosabilul cu `bicycle=no/dismount/use_sidepath` sunt excluse. Nu există opțiune de a permite trotuarele; mersul pe jos cu bicicleta de mână nu e un mod de rutare. Pe 300 de rute aleatorii, conectivitatea a rămas aceeași (289/300 găsite înainte și după), cu rute în medie cu 4% mai lungi.
+- Graful nu păstrează etichetele `vehicle=*`, restricțiile orare sau `access=no` + `bicycle=yes` (căile cu `access=no/private` sunt eliminate la construirea grafului). Etichetele OSM pot fi greșite sau incomplete: **nu e o verificare juridică**; urmează semnalizarea de pe teren.
 - Fără navigație pas cu pas.
 
 ## Despre tura live, locație și căutare (versiunea 2)
+- **Sursele de date ale turei live sunt afișate explicit:** „Se înregistrează” (GPS + senzori), „doar traseul” (fără senzori de mișcare: fără confort), „fără GPS” (vibrațiile nu apar pe hartă) sau „Nu se înregistrează nimic” (cu pașii de recuperare). O tură fără nicio dată nu se salvează; dacă atât locația cât și senzorii sunt refuzați, tura nu pornește.
 - **Ecranul trebuie să rămână aprins.** O aplicație web nu poate citi accelerometrul cu ecranul blocat sau aplicația în fundal; ShockGrid cere Wake Lock unde există și arată un banner dacă se pierd date. Pentru ture cu ecranul blocat rămâne Sensor Logger (importul se face după export; nu există integrare live cu Sensor Logger).
 - **Cifrele live sunt informative.** În timpul turei rulăm aceleași funcții din nucleu pe ultimele ~30 s; rezultatul final vine din procesarea completă după oprire.
 - **Posibilele denivelări nu sunt gropi.** Sunt șocuri puternice ale accelerometrului (giroscopul doar exclude mișcările mâinii). Tipul problemei îl spune utilizatorul, după tură. Confirmările nu schimbă costul rutelor (șocurile sunt deja parțial în RVI).

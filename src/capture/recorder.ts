@@ -65,6 +65,25 @@ export function browserDeps(): RecorderDeps {
 
 export type RecState = 'recording' | 'paused' | 'stopped';
 
+/** starea GPS în timpul turei */
+export type GpsState = 'searching' | 'ok' | 'stale' | 'denied' | 'unavailable';
+/** ce surse de date produc efectiv date: tura e utilă doar dacă măcar una produce */
+export type SourceState = 'waiting' | 'both' | 'gps_only' | 'imu_only' | 'none';
+
+/** cât așteptăm primul semnal înainte să spunem că o sursă lipsește */
+export const IMU_WAIT_MS = 3000;
+export const GPS_WAIT_MS = 45000;
+
+export function classifySources(imu: 'ok' | 'waiting' | 'none', gps: GpsState): SourceState {
+  const imuHas = imu === 'ok';
+  const gpsHas = gps === 'ok' || gps === 'stale';
+  if (imuHas && gpsHas) return 'both';
+  if (imu === 'waiting' || gps === 'searching') return 'waiting';
+  if (gpsHas) return 'gps_only';
+  if (imuHas) return 'imu_only';
+  return 'none';
+}
+
 export interface LiveStats {
   state: RecState;
   elapsed_s: number;
@@ -76,6 +95,8 @@ export interface LiveStats {
   lastFixAge_s: number | null;
   wakeLock: 'on' | 'off' | 'error' | 'unsupported';
   imu: 'ok' | 'waiting' | 'none';
+  gps: GpsState;
+  sources: SourceState;
   problems: string[];
   live: LiveSummary;
   track: [number, number][];
@@ -97,6 +118,8 @@ export class Recorder {
   private lastMotionT = 0;
   private lastFix: { t: number; lat: number; lon: number; acc: number | null; speed: number | null } | null = null;
   private nFix = 0;
+  private gpsErr: number | null = null;
+  private gpsStart = 0;
   private problems = new Set<string>();
   private paused = false;
   private stopped = false;
@@ -150,22 +173,7 @@ export class Recorder {
       if (hidden) { this.ev('visibility_hidden'); this.problems.add('ecranul a fost stins sau aplicația ascunsă: senzorii nu s-au citit în acel interval'); }
       else { this.ev('visibility_visible'); void this.lockScreen(); }
     }) ?? null;
-    if (this.deps.geo) {
-      this.watchId = this.deps.geo.watchPosition(
-        (p) => {
-          if (this.paused || this.stopped) return;
-          const c = p.coords;
-          const fix = { fix_t: p.timestamp, recv_t: this.deps.now(), lat: c.latitude, lon: c.longitude, acc: n(c.accuracy), alt: n(c.altitude), alt_acc: n(c.altitudeAccuracy), speed: n(c.speed), heading: n(c.heading) };
-          this.gps.push(fix);
-          this.nFix++;
-          this.lastFix = { t: this.deps.now(), lat: fix.lat, lon: fix.lon, acc: fix.acc, speed: fix.speed };
-          if (fix.acc === null || fix.acc <= 30) this.track.push([fix.lat, fix.lon]);
-          this.analyzer.addFix({ t: fix.fix_t, lat: fix.lat, lon: fix.lon, acc: fix.acc, alt: fix.alt, speed: fix.speed, heading: fix.heading, speedAcc: null });
-        },
-        (err) => { this.ev('gps_error', `${err.code} ${err.message}`); this.problems.add(err.code === 1 ? 'accesul la locație e refuzat' : 'GPS indisponibil'); },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
-      );
-    } else this.problems.add('locația nu e disponibilă în acest browser');
+    this.watchGps();
     await this.lockScreen();
     let lastStale = 0;
     this.timer = this.deps.setInterval(() => {
@@ -175,6 +183,43 @@ export class Recorder {
       void this.flush();
     }, 1000);
   }
+
+  /** (re)pornește urmărirea GPS; folosit și la „Reîncearcă” după ce utilizatorul a schimbat permisiunea */
+  watchGps() {
+    if (this.stopped) return;
+    if (this.watchId !== null && this.deps.geo) this.deps.geo.clearWatch(this.watchId);
+    this.watchId = null;
+    this.gpsErr = null;
+    this.gpsStart = this.deps.now();
+    if (this.deps.geo) {
+      this.watchId = this.deps.geo.watchPosition(
+        (p) => {
+          if (this.paused || this.stopped) return;
+          const c = p.coords;
+          const fix = { fix_t: p.timestamp, recv_t: this.deps.now(), lat: c.latitude, lon: c.longitude, acc: n(c.accuracy), alt: n(c.altitude), alt_acc: n(c.altitudeAccuracy), speed: n(c.speed), heading: n(c.heading) };
+          this.gps.push(fix);
+          this.nFix++;
+          this.gpsErr = null;
+          this.lastFix = { t: this.deps.now(), lat: fix.lat, lon: fix.lon, acc: fix.acc, speed: fix.speed };
+          if (fix.acc === null || fix.acc <= 30) this.track.push([fix.lat, fix.lon]);
+          this.analyzer.addFix({ t: fix.fix_t, lat: fix.lat, lon: fix.lon, acc: fix.acc, alt: fix.alt, speed: fix.speed, heading: fix.heading, speedAcc: null });
+        },
+        (err) => { this.ev('gps_error', `${err.code} ${err.message}`); this.gpsErr = err.code; },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
+      );
+    }
+  }
+
+  private gpsState(now: number): GpsState {
+    if (!this.deps.geo) return 'unavailable';
+    if (this.lastFix) return now - this.lastFix.t > 5000 ? 'stale' : 'ok';
+    if (this.gpsErr === 1) return 'denied';
+    if (now - this.gpsStart > GPS_WAIT_MS) return 'unavailable';
+    return 'searching';
+  }
+
+  /** nu s-a colectat nimic: nici mostre de mișcare, nici poziții GPS */
+  isEmpty(): boolean { return this.count === 0 && this.nFix === 0; }
 
   private async lockScreen() {
     if (!this.deps.requestWakeLock) { this.wakeState = 'unsupported'; return; }
@@ -219,10 +264,12 @@ export class Recorder {
     const nowPerf = now; // timpii mostrelor sunt tot în ms epoch
     this.recent = this.recent.filter((t) => nowPerf - t < 5000);
     const problems = [...this.problems];
-    if (!this.paused && this.lastFix && now - this.lastFix.t > 5000) problems.push('niciun semnal GPS de peste 5 s');
-    const imu: LiveStats['imu'] = this.count === 0 ? (now - this.start > 3000 ? 'none' : 'waiting') : 'ok';
-    if (!this.paused && imu === 'none') problems.push('senzorii de mișcare nu trimit date în acest browser');
-    else if (!this.paused && this.count > 0 && nowPerf - this.lastMotionT > 1500) problems.push('senzorii de mișcare s-au oprit');
+    const imu: LiveStats['imu'] = this.count === 0 ? (now - this.start > IMU_WAIT_MS ? 'none' : 'waiting') : 'ok';
+    const gps = this.gpsState(now);
+    const sources = classifySources(imu, gps);
+    // lipsa unei surse întregi e afișată separat (sources); aici doar întreruperile
+    if (!this.paused && gps === 'stale') problems.push('niciun semnal GPS de peste 5 s');
+    if (!this.paused && this.count > 0 && nowPerf - this.lastMotionT > 1500) problems.push('senzorii de mișcare s-au oprit');
     const pausedNow = this.pausedAt !== null ? now - this.pausedAt : 0;
     return {
       state: this.stopped ? 'stopped' : this.paused ? 'paused' : 'recording',
@@ -235,6 +282,8 @@ export class Recorder {
       lastFixAge_s: this.lastFix ? (now - this.lastFix.t) / 1000 : null,
       wakeLock: this.wakeState,
       imu,
+      gps,
+      sources,
       problems,
       live: this.analyzer.summary(now),
       track: this.track,

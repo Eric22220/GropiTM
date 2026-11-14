@@ -28,7 +28,19 @@ export function DataPage() {
         <dt>Căutare adrese</dt><dd>Străzi: local, din OpenStreetMap. Adrese și locuri: Photon (komoot), pe baza OpenStreetMap</dd>
         <dt>Hartă de fundal</dt><dd>Tile-uri OpenStreetMap</dd>
       </dl>
-      <h2>Exporturi pentru instituții</h2>
+      <p className="small">Exporturile pentru instituții (GeoJSON/JSON) sunt în Mai mult → Instrumente avansate.</p>
+      <p className="xs muted">Cod: MIT. Date derivate din OpenStreetMap: ODbL 1.0.</p>
+    </div></main>
+  );
+}
+
+/** Exporturile pentru instituții (în Instrumente avansate). */
+export function ExportsPage() {
+  const graph = useApp((s) => s.graph);
+  const layer = useApp((s) => s.layer);
+  return (
+    <main className="screen"><div className="wrap stack">
+      <Header title="Exporturi pentru instituții" back="#/more/advanced" />
       <p className="small muted">Segmentele cu date (agregate) și zonele cu șocuri, în formatele GeoJSON și JSON, licență ODbL. Includ și turele tale locale dacă sunt activate în hartă.</p>
       <div className="grid2">
         <button className="btn" disabled={!graph} onClick={() => download('comfort-layer.geojson', JSON.stringify(comfortGeoJSON(layer, graph!)), 'application/geo+json')}><Download /> Confort .geojson</button>

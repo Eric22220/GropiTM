@@ -2,11 +2,14 @@
 
 ## Lista rapidă pentru mâine (fără laptop)
 
-**Acasă, înainte de plecare (10 min)**
-1. Pe iPhone, deschide ShockGrid de pe ecranul principal → **Mai mult → Caută actualizări**. Trebuie să scrie „Ai cea mai nouă versiune”.
-2. Telefoane încărcate (≥ 80%). Suport ferm pe ghidon; telefonul nu se mișcă dacă scuturi ghidonul.
-3. În **Sensor Logger** (pe ambele telefoane), la senzori: **Accelerometer, Gyroscope, versiunile Uncalibrated, Location** pornite; frecvența **100 Hz**.
-4. **Test de 1 minut afară:** pornește înregistrarea în Sensor Logger, mergi pe jos 1 minut cu telefonul blocat, oprește → **Export → ZIP** → salvează în Fișiere / Descărcări → ShockGrid → **Ture → Importă**. Trebuie să apară tura cu GPS (traseul pe hartă). Mesajul „nu putem estima confortul” e normal pentru mers pe jos.
+**Acasă, înainte de plecare (10 min, pe iPhone)**
+1. Deschide ShockGrid de pe ecranul principal → **Mai mult → Caută actualizări** → „Ai cea mai nouă versiune”. Dacă nu: închide complet aplicația, redeschide-o, repetă.
+2. **Traseu**: alege A și B ale traseului demo. Înainte de ture trebuie să scrie **„Confort necunoscut · nemăsurat”** (insignă portocalie), niciodată „cea mai confortabilă”. Ruta nu trece pe trotuare.
+3. **Ture → Pornește o tură → Pornește tura**: apasă **Permite** la mișcare și la locație. În ~5 s, sus trebuie să scrie **„Se înregistrează”**. Dacă scrie „doar traseul”, „fără GPS” sau „Nu se înregistrează nimic”: deschide „Cum repari” și urmează pașii, apoi **Reîncearcă**.
+4. Ieși afară, 1 minut pe jos cu ecranul aprins → **Stop → Termină tura**. Apare pagina turei (la mers pe jos „nu putem estima confortul” e normal). Șterge apoi tura de test (pagina turei → Șterge).
+5. În **Sensor Logger**: **Accelerometer, Gyroscope, versiunile Uncalibrated, Location** pornite; **100 Hz**.
+6. Test Sensor Logger de 1 minut afară, cu telefonul blocat → **Export → ZIP** → Fișiere → ShockGrid → **Ture → Importă**. Trebuie să apară traseul GPS. Șterge apoi tura de test.
+7. Telefoane încărcate (≥ 80%), Modul consum redus oprit, suport ferm pe ghidon (telefonul nu se mișcă dacă scuturi ghidonul).
 
 **Pe traseu**
 5. Pornește înregistrarea în Sensor Logger **înainte** de primul segment, din oprire. Telefonul poate fi blocat.
@@ -23,7 +26,12 @@
 **Ce NU e o problemă**
 - Linie întreruptă = o singură trecere sau GPS slab. Normal după prima tură.
 - Străzile fără culoare = încă nemăsurate.
-- „Nu avem încă suficiente măsurători pentru o recomandare de confort” pe rute nemăsurate = corect.
+- „Confort necunoscut” pe rute măsurate sub 50% = corect. O alternativă apare doar când ambele rute sunt măsurate.
+- Clasele A–E sunt relative la turele voastre: chiar dacă ambele trasee sunt bune, unele segmente vor fi D–E.
+
+**După ce ambele trasee A→B au câte 2 ture**
+- **Traseu** cu aceleași A și B: fie apare alternativa „recomandată” cu diferența măsurată (metri D–E în minus), fie „Nu am găsit o alternativă măsurată cu mai puține vibrații”. Dacă ruta calculată nu coincide cu traseul pedalat, acoperirea poate rămâne sub 50% („necunoscut”): e corect.
+- Pentru compararea directă a celor două trasee pedalate: **Ture → Compară** (alege câte o tură din fiecare traseu).
 
 **Ce trebuie notat (pentru echipă)**
 - Ora fiecărui segment de referință și a fiecărui traseu, numele fișierelor.

@@ -19,7 +19,7 @@ export function ReportsPage() {
           {reports.map((r) => (
             <Item key={r.id} href={`#/report/${r.id}`} icon={r.status === 'draft' ? <Bookmark /> : <Flag />} tone={r.status === 'draft' ? undefined : 'danger'}
               title={r.status === 'draft' ? 'Marcaj de completat' : typeLabel(r.type)}
-              sub={`${new Date(r.created_at).toLocaleString('ro-RO', { dateStyle: 'medium', timeStyle: 'short' })}${r.source === 'shock' ? ' · confirmat după tură' : ''}${r.photo ? ' · cu fotografie' : ''}`} />
+              sub={`${new Date(r.created_at).toLocaleString('ro-RO', { dateStyle: 'medium', timeStyle: 'short' })}${r.source === 'shock' ? ' · confirmat după tură' : ''}${r.photo ? ' · cu fotografie' : ''} · doar pe telefon`} />
           ))}
         </div>
       )}

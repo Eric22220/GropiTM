@@ -56,7 +56,7 @@
     color-scheme: dark;
   }
   /* automat în modul întunecat: harta stradală rămâne lizibilă (străzi deschise, etichete clare), doar estompată */
-  .tiles-auto .leaflet-tile-pane { filter: brightness(.8) contrast(1.06) saturate(.78); }
+  .tiles-auto .leaflet-tile-pane { filter: brightness(.86) contrast(1.04) saturate(.8); }
   .leaflet-container { background: #2a3038; }
 }
 /* stil „întunecat” ales explicit: inversare mai deschisă, cu etichete albe lizibile */
@@ -120,7 +120,7 @@ p { margin: 0 0 10px; }
 .btn.ghost { background: transparent; border-color: var(--border); }
 .btn.block { width: 100%; }
 .btn.lg { min-height: 56px; font-size: 17px; }
-.btn.sm { min-height: 40px; padding: 0 14px; font-size: 14px; }
+.btn.sm { min-height: 44px; padding: 0 14px; font-size: 14px; }
 .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 .icon-btn { width: 48px; height: 48px; border-radius: 50%; border: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--surface); color: var(--fg); box-shadow: var(--shadow-1); cursor: pointer; }
 .icon-btn svg { width: 22px; height: 22px; }
@@ -142,6 +142,7 @@ p { margin: 0 0 10px; }
 .map-chip { position: absolute; z-index: 850; left: 12px; top: calc(76px + var(--safe-t)); max-width: calc(100% - 90px); }
 .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; white-space: normal; text-align: left; line-height: 1.3; padding: 6px 12px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow-1); font-size: 13.5px; font-weight: 550; color: var(--fg-2); border: 0; }
 .chip svg { width: 16px; height: 16px; }
+button.chip, a.chip { min-height: 44px; cursor: pointer; }
 .chip.live { background: var(--danger); color: #fff; }
 .leaflet-control-attribution { font-size: 10.5px !important; background: color-mix(in srgb, var(--surface) 80%, transparent) !important; color: var(--muted) !important; }
 .leaflet-control-attribution a { color: var(--fg-2) !important; }
@@ -222,7 +223,7 @@ input[type=range] { width: 100%; accent-color: var(--primary); }
 .choice span { font-size: 12.5px; color: var(--muted); }
 .choice[aria-pressed=true] { border-color: var(--primary); background: var(--primary-soft); }
 .seg { display: flex; background: var(--surface-2); border-radius: 999px; padding: 4px; gap: 4px; }
-.seg button { flex: 1; min-height: 42px; border: 0; border-radius: 999px; background: transparent; font-weight: 600; font-size: 14.5px; cursor: pointer; color: var(--fg-2); }
+.seg button { flex: 1; min-height: 44px; border: 0; border-radius: 999px; background: transparent; font-weight: 600; font-size: 14.5px; cursor: pointer; color: var(--fg-2); }
 .seg button[aria-pressed=true] { background: var(--surface); color: var(--fg); box-shadow: var(--shadow-1); }
 
 /* ---------- planner ---------- */
@@ -295,8 +296,8 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border);
 .sheet.snap .sheet-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding-bottom: 20px; }
 .sheet.snap .sheet-body.locked { overflow: hidden; }
 .sheet-grab { flex: none; cursor: grab; padding: 0 16px; touch-action: none; }
-.grab-btn { display: block; width: 100%; height: 22px; border: 0; background: none; cursor: pointer; position: relative; padding: 0; }
-.grab-btn::before { content: ''; position: absolute; left: 50%; top: 8px; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px; background: var(--surface-3); }
+.grab-btn { display: block; width: 100%; height: 30px; border: 0; background: none; cursor: pointer; position: relative; padding: 0; }
+.grab-btn::before { content: ''; position: absolute; left: 50%; top: 11px; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px; background: var(--surface-3); }
 .sheet-peek { padding-bottom: 6px; }
 .no-nav .sheet.snap .sheet-body { padding-bottom: calc(20px + var(--safe-b)); }
 @media (min-width: 900px) { .sheet.snap { max-height: calc(100% - 32px); } }
@@ -304,7 +305,7 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border);
 .route-headline { display: flex; align-items: baseline; gap: 10px; margin-top: 2px; flex-wrap: wrap; }
 .route-headline b { font-size: 26px; letter-spacing: -.02em; }
 .route-headline span { color: var(--fg-2); font-weight: 600; }
-.icon-btn.sm { width: 40px; height: 40px; }
+.icon-btn.sm { width: 44px; height: 44px; }
 .item .s.wrap { white-space: normal; }
 .skeleton { height: 48px; border-radius: 12px; background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
 @keyframes shimmer { to { background-position: -200% 0; } }

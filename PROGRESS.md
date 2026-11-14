@@ -15,6 +15,20 @@ Fișier de reluare: ce merge, ce a fost verificat și cum, ce nu merge. Cel mai 
 - **Zona cu șoc — „treceri”:** numărul de treceri al zonei = trecerile muchiei pe care stă (din agregarea RVI), minim numărul de detectări. Nu publicăm trasee, deci nu putem număra trecerile prin rază din snapshot.
 - **Ghidul Primăriei:** nu contrazice specificația. Notat: „treat gaps as unknown”, „Romanian first”, WCAG 2.1 AA, „private by default”, Sesizări ca unic canal pentru probleme (nu trimitem sesizări, doar link), `/api/zones` e BROWSER OK (opțional, neimplementat încă).
 
+## Corecturi critice înainte de demo (14.11.2026, ziua)
+Checkpoint: tag `checkpoint-before-critical-fixes`.
+
+**Bug-uri reparate**
+- **Verdictul „cea mai scurtă e și cea mai confortabilă (0% măsurat)”**: cauza era o scădere în `routeStats` (`lungime − necunoscut − OSM`) care lăsa reziduuri de virgulă mobilă (±9·10⁻¹³ m), deci o rută nemăsurată părea „măsurată” și intra pe ramura „same”. Acum metrii măsurați se însumează direct. Verdictele au fost rescrise (`src/core/routeplan.ts`): sub 50% măsurat = „Confort necunoscut” (nodata / insufficient), cea mai scurtă necunoscută + alternativă măsurată = „partial” (informăm, nu recomandăm), „same” și „better” doar cu ambele rute măsurate ≥ 50% și o diferență reală. Insigna verde apare doar pe ruta recomandată; „Confort maxim” a devenit „Alternativă”; procentele sub 1% se afișează „sub 1%”, nu „0%”.
+- **Legalitatea rutelor pe bicicletă**: opțiunea „Permite trotuarele fără marcaj” a fost eliminată (și ignorată în setările salvate). `bikeBlockReason()` exclude trotuarele fără `bicycle=yes/designated`, zonele pietonale / path / track fără drept, treptele, `bicycle=no/dismount/use_sidepath/private`. Înainte, 11,2% din lungimea rutelor aleatorii trecea pe carosabil `use_sidepath` (obligatorie pista alăturată). După: 0%, aceleași 289/300 rute găsite, +4% lungime medie.
+- **Tura live**: stări explicite ale surselor (`both`, `gps_only`, `imu_only`, `none`, `waiting`) în `Recorder.stats()`. Starea „Nu se înregistrează nimic” are pași de recuperare (iPhone / Android), „Reîncearcă” (repornește GPS-ul, recere permisiunea de mișcare) și „Renunță”. O tură fără date nu se mai salvează („Nu s-a înregistrat nimic”), iar cu ambele permisiuni refuzate tura nu pornește. Turele doar cu senzori (fără GPS) se păstrează, cu explicație pe pagina turei.
+- **P1**: exporturile GeoJSON pentru instituții s-au mutat în Instrumente avansate. Rapoartele sunt etichetate „doar pe acest telefon” (formular, listă, hartă). Panoul rutei e mai scurt (explicațiile tehnice au fost condensate). Țintele tactile mici au fost mărite la 44 px. Harta întunecată e puțin mai luminoasă.
+
+**Verificat**
+- Teste: **145/145** în 13 fișiere (de la 109). Noi: verdictele de rută (0%, sub 1%, 40%, parțial, suficient, „same”, alternativă mai proastă); 21 de reguli de acces pe bicicletă; 150 de rute aleatorii pe graful real fără muchii interzise și fără „măsurat fantomă”; 7 teste ale surselor turei live; scenariul demo în store (două rute A→B × 2 ture: fără date → „same” → „better” → ștergere exactă → „same”, reimport refuzat). `tsc` și build curate.
+- Browser (Chromium din panou, GPS simulat; 390×844, 412×915, desktop): panoul rutei fără date arată „Confort necunoscut · nemăsurat” (portocaliu); refuzul locației + senzori opriți blochează pornirea, cu pași de recuperare; „Nu se înregistrează nimic” → Stop → „Nu s-a înregistrat nimic”, nicio tură salvată; „doar traseul” cu GPS simulat; exporturile apar în Instrumente avansate.
+- **Neverificat pe telefon fizic** (senzori, permisiuni iOS, Wake Lock, selectorul de fișiere iOS). Nicio tură reală pe bicicletă încă; niciun parametru recalibrat.
+
 ## Finisare finală (14.11.2026, noaptea)
 Checkpoint: tag `checkpoint-before-final-polish` (commit 492c3ec; arborele identic cu HEAD de atunci, verificat cu `git archive`). Restaurare: `git checkout checkpoint-before-final-polish`.
 

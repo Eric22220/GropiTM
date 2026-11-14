@@ -4,7 +4,7 @@ import { aggregate, type RideContribution } from '../src/core/aggregate';
 import { DEFAULT_CONFIG } from '../src/core/config';
 import { Graph, type GraphJson } from '../src/core/graph';
 import { matchFixes } from '../src/core/mapmatch';
-import { DEFAULT_ROUTE_OPTIONS, Router, routeStats } from '../src/core/route';
+import { DEFAULT_ROUTE_OPTIONS, Router, bikeBlockReason, routeStats } from '../src/core/route';
 import type { GpsFix } from '../src/core/types';
 import { rng } from '../src/core/stats';
 import { makeGraph } from './helpers';
@@ -34,11 +34,69 @@ describe('rutare A*', () => {
     expect(r2.route(0, 1, null, DEFAULT_ROUTE_OPTIONS).found).toBe(true);
     expect(r2.route(1, 0, null, DEFAULT_ROUTE_OPTIONS).found).toBe(false);
   });
-  it('trotuarele fără drept pentru biciclete sunt excluse implicit', () => {
+  it('trotuarele obișnuite nu sunt folosite niciodată pentru bicicletă', () => {
     const g3 = makeGraph([[LAT, LON], [LAT, LON + dLon(500)]], [{ f: 0, t: 1, kind: 'trotuar', highway: 'footway' }]);
     const r3 = new Router(g3);
     expect(r3.route(0, 1, null, DEFAULT_ROUTE_OPTIONS).found).toBe(false);
-    expect(r3.route(0, 1, null, { ...DEFAULT_ROUTE_OPTIONS, allowSidewalks: true }).found).toBe(true);
+    // opțiunea veche „allowSidewalks” (salvată în setări vechi) nu mai are efect
+    expect(r3.route(0, 1, null, { ...DEFAULT_ROUTE_OPTIONS, allowSidewalks: true } as typeof DEFAULT_ROUTE_OPTIONS).found).toBe(false);
+  });
+  const one = (e: { kind?: 'trotuar' | 'alee' | 'pista' | 'carosabil'; highway?: string; bicycle?: string }) => {
+    const gx = makeGraph([[LAT, LON], [LAT, LON + dLon(300)]], [{ f: 0, t: 1, ...e }]);
+    return { ok: new Router(gx).route(0, 1, null, DEFAULT_ROUTE_OPTIONS).found, reason: bikeBlockReason(gx, 0) };
+  };
+  it.each([
+    ['trotuar fără etichetă', { kind: 'trotuar', highway: 'footway' }],
+    ['trotuar bicycle=no', { kind: 'trotuar', highway: 'footway', bicycle: 'no' }],
+    ['trotuar bicycle=dismount', { kind: 'trotuar', highway: 'footway', bicycle: 'dismount' }],
+    ['trotuar bicycle=permissive', { kind: 'trotuar', highway: 'footway', bicycle: 'permissive' }],
+    ['zonă pietonală fără drept', { kind: 'alee', highway: 'pedestrian' }],
+    ['path fără drept', { kind: 'alee', highway: 'path' }],
+    ['track fără drept', { kind: 'alee', highway: 'track' }],
+    ['trepte', { kind: 'alee', highway: 'steps', bicycle: 'yes' }],
+    ['carosabil cu bicycle=use_sidepath', { kind: 'carosabil', highway: 'primary', bicycle: 'use_sidepath' }],
+    ['carosabil cu bicycle=no', { kind: 'carosabil', highway: 'residential', bicycle: 'no' }],
+    ['drum privat', { kind: 'carosabil', highway: 'service', bicycle: 'private' }],
+    ['pistă cu bicycle=no', { kind: 'pista', highway: 'cycleway', bicycle: 'no' }],
+  ] as const)('muchie interzisă bicicletelor: %s', (_n, e) => {
+    const x = one(e);
+    expect(x.ok).toBe(false);
+    expect(x.reason).toBeTruthy();
+  });
+  it.each([
+    ['pistă de biciclete', { kind: 'pista', highway: 'cycleway' }],
+    ['footway bicycle=designated', { kind: 'pista', highway: 'footway', bicycle: 'designated' }],
+    ['trotuar cu bicycle=yes (partajat, semnalizat)', { kind: 'trotuar', highway: 'footway', bicycle: 'yes' }],
+    ['zonă pietonală cu bicycle=designated', { kind: 'alee', highway: 'pedestrian', bicycle: 'designated' }],
+    ['path cu bicycle=permissive', { kind: 'alee', highway: 'path', bicycle: 'permissive' }],
+    ['stradă rezidențială', { kind: 'carosabil', highway: 'residential' }],
+    ['stradă principală fără restricție', { kind: 'carosabil', highway: 'primary' }],
+  ] as const)('muchie permisă: %s', (_n, e) => {
+    const x = one(e);
+    expect(x.ok).toBe(true);
+    expect(x.reason).toBeNull();
+  });
+  it('ruta ocolește trotuarul interzis pe o stradă legală, chiar dacă e mai lungă', () => {
+    // A(0) ─trotuar─ B(1) 300 m; A ─ C(2) ─ B pe stradă (~520 m)
+    const gx = makeGraph(
+      [[LAT, LON], [LAT, LON + dLon(300)], [LAT + dLat(200), LON + dLon(150)]],
+      [{ f: 0, t: 1, kind: 'trotuar', highway: 'footway' }, { f: 0, t: 2 }, { f: 2, t: 1 }],
+    );
+    const r = new Router(gx).route(0, 1, null, { ...DEFAULT_ROUTE_OPTIONS, w_c: 0 });
+    expect(r.found).toBe(true);
+    expect(r.edges.map((e) => e.edge)).toEqual([1, 2]);
+  });
+  it('carosabilul cu use_sidepath e evitat în favoarea pistei alăturate', () => {
+    const gx = makeGraph(
+      [[LAT, LON], [LAT, LON + dLon(400)], [LAT + dLat(8), LON], [LAT + dLat(8), LON + dLon(400)]],
+      [{ f: 0, t: 1, highway: 'primary', bicycle: 'use_sidepath' }, { f: 0, t: 2 }, { f: 2, t: 3, kind: 'pista', highway: 'cycleway' }, { f: 3, t: 1 }],
+    );
+    const r = new Router(gx).route(0, 1, null, { ...DEFAULT_ROUTE_OPTIONS, w_c: 0 });
+    expect(r.edges.map((e) => e.edge)).toEqual([1, 2, 3]);
+  });
+  it('sensul unic contează și pe pistă', () => {
+    const gx = makeGraph([[LAT, LON], [LAT, LON + dLon(300)]], [{ f: 0, t: 1, kind: 'pista', highway: 'cycleway', oneway: 1 }]);
+    expect(new Router(gx).route(1, 0, null, DEFAULT_ROUTE_OPTIONS).found).toBe(false);
   });
   it('regula de onestitate: > 50% UNKNOWN → date insuficiente', () => {
     const r = rt.route(0, 2, null, DEFAULT_ROUTE_OPTIONS);

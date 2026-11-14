@@ -112,7 +112,7 @@ export function useApp<T>(sel: (s: AppState) => T): T {
 }
 
 let router: Router | null = null;
-const compCache = new Map<boolean, Uint8Array>();
+let compCache: Uint8Array | null = null;
 export function getRouter() {
   if (!router && state.graph) router = new Router(state.graph);
   return router;
@@ -141,14 +141,14 @@ function recompute(rides = state.rides) {
 export const lengthOf = (e: number) => state.graph?.length[e] ?? 0;
 
 /** doar pentru teste: graful fără fetch */
-export function _testSetGraph(g: Graph | null) { set({ graph: g, graphStatus: g ? 'ready' : 'missing' }); router = null; compCache.clear(); }
+export function _testSetGraph(g: Graph | null) { set({ graph: g, graphStatus: g ? 'ready' : 'missing' }); router = null; compCache = null; }
 
 // ---------------- inițializare ----------------
 export async function init() {
   const saved = await idb.kvGet<Partial<Settings>>('settings');
   const rejected = (await idb.kvGet<string[]>('rejected')) ?? [];
   const ab = (await idb.kvGet<AppState['ab']>('ab')) ?? { a: null, b: null };
-  const settings: Settings = { ...defaultSettings, ...(saved ?? {}), cfg: { ...DEFAULT_CONFIG, ...(saved?.cfg ?? {}) }, route: { ...DEFAULT_ROUTE_OPTIONS, ...(saved?.route ?? {}) } };
+  const settings: Settings = { ...defaultSettings, ...(saved ?? {}), cfg: { ...DEFAULT_CONFIG, ...(saved?.cfg ?? {}) }, route: routeOpts(saved?.route) };
   const rides = (await idb.listRides()).map((r) => ({ ...r, file: null }));
   const reviews = (await idb.kvGet<Record<string, ShockReview>>('shock-reviews')) ?? {};
   const recent = (await idb.kvGet<Place[]>('recent-places')) ?? [];
@@ -171,7 +171,7 @@ export async function init() {
       const j = (await r.json()) as GraphJson;
       set({ graph: new Graph(j), graphStatus: 'ready' });
       router = null;
-      compCache.clear();
+      compCache = null;
     })
     .catch((e) => { console.warn(e); set({ graphStatus: 'error' }); });
   await Promise.all([snapP, graphP]);
@@ -191,13 +191,21 @@ export async function init() {
 }
 
 // ---------------- rutare ----------------
+/** opțiunile de rutare salvate, fără chei vechi (ex. „allowSidewalks”, eliminată: trotuarele nu sunt niciodată permise) */
+export function routeOpts(saved?: Partial<RouteOptions> | null): RouteOptions {
+  const o = { ...DEFAULT_ROUTE_OPTIONS };
+  if (saved && typeof saved.p_unknown === 'number') o.p_unknown = saved.p_unknown;
+  if (saved && typeof saved.w_c === 'number') o.w_c = saved.w_c;
+  if (saved && typeof saved.useOsmSurface === 'boolean') o.useOsmSurface = saved.useOsmSurface;
+  return o;
+}
+
 export function snapNode(lat: number, lon: number): number {
   const g = state.graph;
   if (!g) return -1;
-  const allow = state.settings.route.allowSidewalks;
-  let comp = compCache.get(allow);
-  if (!comp) { comp = mainComponent(g, allow); compCache.set(allow, comp); }
-  return g.nearestNode(lat, lon, (n) => comp![n] === 1, 600);
+  if (!compCache) compCache = mainComponent(g);
+  const comp = compCache;
+  return g.nearestNode(lat, lon, (n) => comp[n] === 1, 600);
 }
 
 export function computeRoutes(layer: ComfortLayer = state.layer, profile: ProfileKey = state.settings.profile): RoutePair {
@@ -212,7 +220,7 @@ export function computeRoutes(layer: ComfortLayer = state.layer, profile: Profil
   const oC = { ...base, w_c: PROFILES[profile] };
   const rs = rt.route(src, dst, layer, oS);
   const rc = rt.route(src, dst, layer, oC);
-  if (!rs.found) return { shortest: null, chosen: null, layerVersion: layer.version, error: 'Nu există rută între A și B în graful rutabil (sens unic, trotuare excluse?).' };
+  if (!rs.found) return { shortest: null, chosen: null, layerVersion: layer.version, error: 'Nu există rută legală pe bicicletă între A și B (sens unic, trotuare sau căi interzise bicicletelor).' };
   return {
     shortest: { r: rs, s: routeStats(g, layer, rs, oC) },
     chosen: rc.found ? { r: rc, s: routeStats(g, layer, rc, oC) } : null,
@@ -229,7 +237,6 @@ export async function setAB(ab: AppState['ab']) {
 export async function updateSettings(patch: Partial<Settings>) {
   const settings = { ...state.settings, ...patch };
   set({ settings });
-  if (patch.route && patch.route.allowSidewalks !== undefined) compCache.clear();
   if (patch.cfg || patch.fixedThresholds !== undefined) recompute();
   await idb.kvSet('settings', settings).catch(() => {});
 }
